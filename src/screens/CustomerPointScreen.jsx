@@ -1,9 +1,7 @@
-import { POINTS_PER_STAMP, REWARD_THRESHOLD, STORE_NAME, maskPhone } from '../lib/format'
+import { POINTS_PER_STAMP, REWARD_THRESHOLD, STORE_NAME, knownCustomers, maskPhone } from '../lib/format'
 
-const customer = {
-  phone: '010-2345-7788',
-  balance: 3420,
-  joinedAt: '2026년 3월',
+const knownCustomerData = {
+  '01023457788': { balance: 3420, joinedAt: '2026년 3월' },
 }
 
 const recentEvents = [
@@ -16,8 +14,14 @@ const recentEvents = [
 
 const TOTAL_STAMPS = REWARD_THRESHOLD / POINTS_PER_STAMP
 
-export default function CustomerPointScreen() {
-  const { balance, phone } = customer
+export default function CustomerPointScreen({ phone = '010-2345-7788', onChangePhone }) {
+  const digits = phone.replace(/\D/g, '')
+  const data = knownCustomerData[digits]
+  const isNewCustomer = !knownCustomers.has(digits)
+  const balance = data?.balance ?? 0
+  const joinedAt = data?.joinedAt ?? '오늘'
+  const events = isNewCustomer ? [] : recentEvents
+
   const balanceInCycle = balance % REWARD_THRESHOLD
   const pointToNextReward = REWARD_THRESHOLD - balanceInCycle
   const filledStamps = Math.floor(balanceInCycle / POINTS_PER_STAMP)
@@ -26,7 +30,7 @@ export default function CustomerPointScreen() {
 
   return (
     <div className="mx-auto max-w-md px-5 pb-32 pt-6">
-      <Header />
+      <Header onChangePhone={onChangePhone} />
 
       <main className="mt-7">
         <div className="text-[13px] text-coffee-600">안녕하세요,</div>
@@ -34,7 +38,7 @@ export default function CustomerPointScreen() {
           {maskPhone(phone)} 손님 <span aria-hidden>👋</span>
         </h1>
         <p className="mt-1 text-xs text-coffee-600">
-          {customer.joinedAt}부터 함께해주셔서 감사합니다
+          {isNewCustomer ? '오늘 처음 만나뵙네요. 환영합니다 🌱' : `${joinedAt}부터 함께해주셔서 감사합니다`}
         </p>
 
         <BalanceCard
@@ -47,13 +51,13 @@ export default function CustomerPointScreen() {
 
         <InfoCard />
 
-        <HistoryList events={recentEvents} />
+        <HistoryList events={events} isNewCustomer={isNewCustomer} />
       </main>
     </div>
   )
 }
 
-function Header() {
+function Header({ onChangePhone }) {
   return (
     <header className="flex items-center justify-between">
       <div className="flex items-center gap-2">
@@ -67,7 +71,8 @@ function Header() {
       </div>
       <button
         type="button"
-        className="grid h-9 w-9 place-items-center rounded-full bg-white text-coffee-600 shadow-[var(--shadow-soft)]"
+        onClick={onChangePhone}
+        className="grid h-9 w-9 place-items-center rounded-full bg-white text-coffee-600 shadow-[var(--shadow-soft)] transition-all hover:bg-cream-50 active:scale-95"
         aria-label="다른 번호로 조회"
       >
         ↻
@@ -166,7 +171,7 @@ function StampRow({ filledStamps, partialFraction }) {
 function InfoCard() {
   return (
     <div className="mt-5 flex items-center gap-3 rounded-2xl border border-cream-300 bg-cream-50 px-4 py-3">
-      <div className="grid h-9 w-9 place-shrink-0 place-items-center rounded-full bg-caramel-500/15 text-base">
+      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-caramel-500/15 text-base">
         💡
       </div>
       <div className="text-[13px] leading-snug text-coffee-700">
@@ -178,16 +183,29 @@ function InfoCard() {
   )
 }
 
-function HistoryList({ events }) {
+function HistoryList({ events, isNewCustomer }) {
   return (
     <section className="mt-8">
       <div className="flex items-baseline justify-between">
         <h2 className="text-sm font-bold text-coffee-900">최근 내역</h2>
-        <button type="button" className="text-xs text-coffee-600 underline-offset-2 hover:underline">
-          전체 보기
-        </button>
+        {events.length > 0 && (
+          <button type="button" className="text-xs text-coffee-600 underline-offset-2 hover:underline">
+            전체 보기
+          </button>
+        )}
       </div>
 
+      {events.length === 0 ? (
+        <div className="mt-3 rounded-2xl border border-dashed border-cream-300 bg-cream-50 px-5 py-8 text-center">
+          <div className="text-2xl">🌱</div>
+          <div className="mt-1.5 text-sm font-semibold text-coffee-900">
+            {isNewCustomer ? '아직 적립 내역이 없어요' : '내역이 없어요'}
+          </div>
+          <div className="mt-1 text-[12px] text-coffee-600">
+            카운터에서 첫 적립을 시작해보세요 ☕
+          </div>
+        </div>
+      ) : (
       <ul className="mt-3 space-y-2">
         {events.map((e) => {
           const isEarn = e.type === 'earn'
@@ -225,6 +243,7 @@ function HistoryList({ events }) {
           )
         })}
       </ul>
+      )}
     </section>
   )
 }

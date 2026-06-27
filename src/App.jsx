@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import OwnerRewardScreen from './screens/OwnerRewardScreen'
+import CustomerLandingScreen from './screens/CustomerLandingScreen'
 import CustomerPointScreen from './screens/CustomerPointScreen'
 
 const MODES = [
@@ -9,11 +10,26 @@ const MODES = [
 
 export default function App() {
   const [mode, setMode] = useState('owner')
+  const [customerPhone, setCustomerPhone] = useState(null)
+
+  const handleModeChange = (next) => {
+    setMode(next)
+    if (next === 'customer') setCustomerPhone(null)
+  }
 
   return (
     <div className="min-h-full">
-      <DemoSwitcher mode={mode} onChange={setMode} />
-      {mode === 'owner' ? <OwnerRewardScreen /> : <CustomerPointScreen />}
+      <DemoSwitcher mode={mode} onChange={handleModeChange} />
+      {mode === 'owner' ? (
+        <OwnerRewardScreen />
+      ) : customerPhone ? (
+        <CustomerPointScreen
+          phone={customerPhone}
+          onChangePhone={() => setCustomerPhone(null)}
+        />
+      ) : (
+        <CustomerLandingScreen onSubmit={setCustomerPhone} />
+      )}
     </div>
   )
 }
