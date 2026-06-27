@@ -125,6 +125,7 @@ npm run dev
 
 ## 문서
 
+- 📈 **[진행 상황](./document/progress.md)** — 화면별 완성도, 데이터 시드, 다음 단계 후보, TODO
 - 🧪 **[수동 테스트 가이드](./document/manual-test-guide.md)** — 화면별 체크리스트와 시나리오
 - [ADR 인덱스](./document/adr/README.md)
 - [ADR-0001 기술 스택](./document/adr/0001-tech-stack.md)
