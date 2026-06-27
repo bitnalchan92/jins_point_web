@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+@theme {
+  --color-cream-50: #fdfaf5;
+  --color-cream-100: #fbf7f1;
+  --color-cream-200: #f5ecdd;
+  --color-cream-300: #e8ddd0;
+  --color-coffee-400: #c4a47a;
+  --color-coffee-500: #a07d52;
+  --color-coffee-600: #8b6f47;
+  --color-coffee-700: #5d4226;
+  --color-coffee-900: #3d2817;
+  --color-caramel-400: #e89968;
+  --color-caramel-500: #d97338;
+  --color-caramel-600: #b85a26;
+  --color-leaf-500: #7a9e5b;
+
+  --font-sans: "Pretendard", "Apple SD Gothic Neo", system-ui, -apple-system, sans-serif;
+  --font-display: "Gmarket Sans", "Pretendard", system-ui, sans-serif;
+
+  --shadow-soft: 0 4px 16px -4px rgba(93, 66, 38, 0.12), 0 2px 6px -2px rgba(93, 66, 38, 0.08);
+  --shadow-lift: 0 12px 32px -8px rgba(93, 66, 38, 0.18), 0 4px 12px -4px rgba(93, 66, 38, 0.1);
+}
+
+@font-face {
+  font-family: "Pretendard";
+  font-weight: 45 920;
+  font-style: normal;
+  font-display: swap;
+  src: url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/PretendardVariable.woff2") format("woff2-variations");
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-cream-100);
+  color: var(--color-coffee-900);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
