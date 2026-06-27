@@ -12,6 +12,7 @@
 | [0004](./0004-percent-reward-policy.md) | 적립 정책: 결제금액의 % | Accepted |
 | [0005](./0005-design-tone.md) | 디자인 톤: 따뜻한 카페 감성 | Accepted |
 | [0006](./0006-demo-mode-switcher.md) | 화면 전환: 데모용 모드 스위처 (라우터 미도입) | Accepted |
+| [0007](./0007-owner-authentication.md) | 사장님 인증: 4자리 PIN + 디바이스 신뢰 모델 | Accepted |
 
 ## 포맷
 
