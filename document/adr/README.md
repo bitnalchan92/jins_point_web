@@ -10,9 +10,10 @@
 | [0002](./0002-phone-based-identification.md) | 손님 식별 방식: 전화번호 only | Accepted |
 | [0003](./0003-single-store-scope.md) | 매장 스코프: 단일 매장 | Accepted |
 | [0004](./0004-percent-reward-policy.md) | 적립 정책: 결제금액의 % | Accepted |
-| [0005](./0005-design-tone.md) | 디자인 톤: 따뜻한 카페 감성 | Accepted |
+| [0005](./0005-design-tone.md) | 디자인 톤: 따뜻한 카페 감성 | Superseded by 0008 |
 | [0006](./0006-demo-mode-switcher.md) | 화면 전환: 데모용 모드 스위처 (라우터 미도입) | Accepted |
 | [0007](./0007-owner-authentication.md) | 사장님 인증: 4자리 PIN + 디바이스 신뢰 모델 | Accepted |
+| [0008](./0008-design-tone-jinscook.md) | 디자인 톤 재정의: 달콤한 진스쿡 (크림 + 옐로우) | Accepted |
 
 ## 포맷
 

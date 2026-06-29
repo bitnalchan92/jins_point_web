@@ -1,207 +1,182 @@
-import { POINT_RATE, STORE_NAME, maskPhone } from '../lib/format'
-
-const todayStats = {
-  rewardCount: 18,
-  pointGiven: 4280,
-  revenue: 85600,
-}
-
-const weeklyTrend = [
-  { day: '월', revenue: 62000 },
-  { day: '화', revenue: 71000 },
-  { day: '수', revenue: 54000 },
-  { day: '목', revenue: 88000 },
-  { day: '금', revenue: 92000 },
-  { day: '토', revenue: 124000 },
-  { day: '일', revenue: 85600, isToday: true },
-]
-
-const topCustomers = [
-  { phone: '010-1212-3434', balance: 12400, visits: 47 },
-  { phone: '010-8888-4444', balance: 8120, visits: 32 },
-  { phone: '010-7777-1234', balance: 5200, visits: 21 },
-]
+import { useState } from 'react'
+import { REWARD_THRESHOLD, STORE_NAME, STORE_TAGLINE } from '../lib/data'
+import { comma } from '../lib/format'
+import { useStore } from '../store'
 
 export default function OwnerDashboardScreen({ onLogout }) {
-  const maxRevenue = Math.max(...weeklyTrend.map((d) => d.revenue))
+  const { customers, rewardLog, rate, updateRate } = useStore()
+
+  const todayEarn = rewardLog.filter((r) => r.type === 'earn').length
+  const totalPoints = customers.reduce((sum, c) => sum + c.points, 0)
+  const top = [...customers].sort((a, b) => b.points - a.points).slice(0, 3)
 
   return (
-    <div className="mx-auto max-w-md px-5 pb-32 pt-6">
-      <Header />
+    <div className="mt-[18px] animate-fade">
+      {/* KPI 3개 */}
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3.5">
+        <KpiCard icon="☕" label="오늘 적립" value={`${todayEarn}건`} tone="brand" />
+        <KpiCard icon="👥" label="손님 수" value={`${customers.length}명`} tone="brand" />
+        <KpiCard icon="⭐" label="총 사용가능 포인트" value={`${comma(totalPoints)}P`} tone="leaf" />
+      </div>
 
-      <main className="mt-6">
-        <h1 className="font-display text-[28px] font-bold leading-tight text-coffee-900">
-          오늘의 가게
-        </h1>
-        <p className="mt-1 text-sm text-coffee-600">
-          오늘도 좋은 하루 보내세요 ☕
-        </p>
-
-        <section className="mt-5 grid grid-cols-3 gap-2">
-          <Kpi label="적립 건수" value={`${todayStats.rewardCount}`} suffix="건" />
-          <Kpi label="지급 포인트" value={todayStats.pointGiven.toLocaleString('ko-KR')} suffix="P" accent />
-          <Kpi label="오늘 매출" value={`${(todayStats.revenue / 10000).toFixed(1)}`} suffix="만원" />
-        </section>
-
-        <TrendCard weeklyTrend={weeklyTrend} maxRevenue={maxRevenue} />
-
-        <TopCustomersCard customers={topCustomers} />
-
-        <StoreInfoCard onLogout={onLogout} />
-      </main>
-    </div>
-  )
-}
-
-function Header() {
-  return (
-    <header className="flex items-center justify-between">
-      <div className="flex items-center gap-2">
-        <div className="grid h-9 w-9 place-items-center rounded-full bg-coffee-900 text-cream-100">
-          <span className="text-base">☕</span>
+      {/* 가게 정보 + 단골 TOP 3 */}
+      <div className="mt-3.5 flex flex-wrap items-stretch gap-3.5">
+        <div className="flex-[2_1_340px] rounded-[20px] border border-line bg-card px-6 py-[22px] shadow-[var(--shadow-soft)]">
+          <h3 className="mb-4 text-base font-extrabold">가게 정보</h3>
+          <div className="flex flex-col gap-3">
+            <InfoRow label="가게명" value={STORE_NAME} />
+            <InfoRow label="업종" value={STORE_TAGLINE} />
+            <RateRow rate={rate} onSave={updateRate} />
+            <InfoRow label="무료 메뉴 기준" value={`${comma(REWARD_THRESHOLD)}P`} />
+            <InfoRow label="누적 단골" value={`${customers.length}명`} />
+          </div>
         </div>
-        <div className="leading-tight">
-          <div className="text-[15px] font-semibold text-coffee-900">{STORE_NAME}</div>
-          <div className="text-[11px] text-coffee-600">사장님 모드</div>
-        </div>
-      </div>
-    </header>
-  )
-}
 
-function Kpi({ label, value, suffix, accent }) {
-  return (
-    <div className="rounded-2xl bg-white px-3 py-3 shadow-[var(--shadow-soft)]">
-      <div className="text-[10px] font-medium uppercase tracking-wide text-coffee-600">
-        {label}
-      </div>
-      <div className="mt-1.5 flex items-baseline gap-0.5">
-        <span
-          className={[
-            'font-display text-2xl font-bold tabular-nums',
-            accent ? 'text-caramel-600' : 'text-coffee-900',
-          ].join(' ')}
-        >
-          {value}
-        </span>
-        <span
-          className={[
-            'text-[10px] font-semibold',
-            accent ? 'text-caramel-600' : 'text-coffee-600',
-          ].join(' ')}
-        >
-          {suffix}
-        </span>
-      </div>
-    </div>
-  )
-}
-
-function TrendCard({ weeklyTrend, maxRevenue }) {
-  return (
-    <section className="mt-5 rounded-2xl bg-white p-5 shadow-[var(--shadow-soft)]">
-      <div className="flex items-baseline justify-between">
-        <h2 className="text-sm font-bold text-coffee-900">이번 주 매출</h2>
-        <span className="text-[11px] text-coffee-600">단위: 만원</span>
-      </div>
-
-      <div className="mt-4 grid h-32 grid-cols-7 items-end gap-1.5">
-        {weeklyTrend.map((d) => {
-          const heightPercent = (d.revenue / maxRevenue) * 100
-          return (
-            <div key={d.day} className="flex h-full flex-col items-center justify-end gap-1.5">
-              <div
-                className={[
-                  'w-full rounded-t-md transition-all',
-                  d.isToday
-                    ? 'bg-gradient-to-t from-caramel-600 to-caramel-400'
-                    : 'bg-cream-300',
-                ].join(' ')}
-                style={{ height: `${heightPercent}%` }}
-                aria-label={`${d.day}요일 ${d.revenue}원`}
-              />
-              <span
-                className={[
-                  'text-[10px] tabular-nums',
-                  d.isToday ? 'font-bold text-caramel-600' : 'text-coffee-600',
-                ].join(' ')}
-              >
-                {d.day}
-              </span>
+        <div className="flex-[1_1_240px] rounded-[20px] border border-line bg-card px-6 py-[22px] shadow-[var(--shadow-soft)]">
+          <h3 className="mb-4 text-base font-extrabold">단골 TOP 3</h3>
+          {top.length === 0 ? (
+            <div className="py-4 text-center text-[13px] text-ink-soft">아직 손님이 없어요</div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {top.map((c, i) => (
+                <div key={c.phone} className="flex items-center gap-3">
+                  <div
+                    className={[
+                      'grid h-[30px] w-[30px] flex-none place-items-center rounded-[9px] text-sm font-extrabold',
+                      i === 0 ? 'bg-brand text-ink' : 'bg-pale-soft text-ink-soft',
+                    ].join(' ')}
+                  >
+                    {i + 1}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[14.5px] font-extrabold">{c.name}</div>
+                    <div className="text-[11.5px] font-semibold text-ink-soft">{c.visits}회 방문</div>
+                  </div>
+                  <div className="text-[15px] font-extrabold text-brand-dark">{comma(c.points)}P</div>
+                </div>
+              ))}
             </div>
-          )
-        })}
+          )}
+        </div>
       </div>
-    </section>
+
+      {/* 로그아웃 */}
+      <div className="mt-3.5">
+        <button
+          type="button"
+          onClick={onLogout}
+          className="w-full rounded-[18px] border-[1.5px] border-[#f0c5bc] bg-[#fff5f3] py-[18px] text-[15px] font-extrabold text-danger shadow-[0_6px_18px_-10px_rgba(216,85,58,.25)] transition hover:bg-[#fdeae5] hover:shadow-[0_8px_22px_-10px_rgba(216,85,58,.35)]"
+        >
+          로그아웃
+        </button>
+      </div>
+    </div>
   )
 }
 
-function TopCustomersCard({ customers }) {
+function KpiCard({ icon, label, value, tone }) {
   return (
-    <section className="mt-5">
-      <div className="flex items-baseline justify-between">
-        <h2 className="text-sm font-bold text-coffee-900">단골 손님 TOP 3</h2>
-        <span className="text-[11px] text-coffee-600">잔액 기준</span>
+    <div className="rounded-[18px] border border-line bg-card px-[22px] py-5 shadow-[var(--shadow-soft)]">
+      <div className="flex items-center gap-2.5">
+        <div
+          className={[
+            'grid h-[34px] w-[34px] place-items-center rounded-[10px] text-[17px]',
+            tone === 'leaf' ? 'bg-leaf-bg' : 'bg-pale',
+          ].join(' ')}
+        >
+          {icon}
+        </div>
+        <span className="text-[13px] font-extrabold text-ink-soft">{label}</span>
       </div>
+      <div className="mt-2.5 text-[30px] font-extrabold tracking-tight tabular-nums">{value}</div>
+    </div>
+  )
+}
 
-      <ul className="mt-3 space-y-2">
-        {customers.map((c, i) => (
-          <li
-            key={c.phone}
-            className="flex items-center gap-3 rounded-xl bg-white px-4 py-3 shadow-[var(--shadow-soft)]"
+function InfoRow({ label, value }) {
+  return (
+    <div className="flex items-center justify-between border-t border-line pt-3 text-sm first:border-t-0 first:pt-0">
+      <span className="font-bold text-ink-soft">{label}</span>
+      <span className="font-extrabold">{value}</span>
+    </div>
+  )
+}
+
+function RateRow({ rate, onSave }) {
+  const [editing, setEditing] = useState(false)
+  const [input, setInput] = useState('')
+
+  const startEdit = () => {
+    setInput(String((rate * 100).toFixed(1)))
+    setEditing(true)
+  }
+
+  const save = () => {
+    const pct = parseFloat(input)
+    if (!isNaN(pct) && pct > 0 && pct <= 100) {
+      onSave(parseFloat((pct / 100).toFixed(4)))
+    }
+    setEditing(false)
+  }
+
+  const cancel = () => setEditing(false)
+
+  if (!editing) {
+    return (
+      <div className="flex items-center justify-between border-t border-line pt-3 text-sm">
+        <span className="font-bold text-ink-soft">적립률</span>
+        <div className="flex items-center gap-2">
+          <span className="font-extrabold">결제금액의 {(rate * 100).toFixed(1)}%</span>
+          <button
+            type="button"
+            onClick={startEdit}
+            className="rounded-[6px] border border-line px-2 py-0.5 text-[11px] font-extrabold text-ink-soft transition hover:border-brand hover:text-brand-dark"
           >
-            <div
-              className={[
-                'grid h-8 w-8 shrink-0 place-items-center rounded-full text-sm font-bold tabular-nums',
-                i === 0 ? 'bg-caramel-500 text-cream-50' : 'bg-cream-200 text-coffee-700',
-              ].join(' ')}
-            >
-              {i + 1}
-            </div>
-            <div className="min-w-0 flex-1 leading-tight">
-              <div className="truncate text-sm font-semibold tabular-nums text-coffee-900">
-                {maskPhone(c.phone)}
-              </div>
-              <div className="text-[11px] text-coffee-600">
-                누적 {c.visits}회 방문
-              </div>
-            </div>
-            <div className="text-sm font-bold tabular-nums text-caramel-600">
-              {c.balance.toLocaleString('ko-KR')}P
-            </div>
-          </li>
-        ))}
-      </ul>
-    </section>
-  )
-}
+            수정
+          </button>
+        </div>
+      </div>
+    )
+  }
 
-function StoreInfoCard({ onLogout }) {
+  const pct = parseFloat(input)
+  const valid = !isNaN(pct) && pct > 0 && pct <= 100
+
   return (
-    <section className="mt-5 rounded-2xl bg-white p-5 shadow-[var(--shadow-soft)]">
-      <h2 className="text-sm font-bold text-coffee-900">가게 정보</h2>
-      <dl className="mt-3 space-y-2 text-sm">
-        <Row label="가게 이름" value={STORE_NAME} />
-        <Row label="적립률" value={`결제 금액의 ${POINT_RATE * 100}%`} />
-        <Row label="리워드 기준" value="5,000P → 음료 1잔 무료" />
-      </dl>
-
-      <button
-        type="button"
-        onClick={onLogout}
-        className="mt-5 w-full rounded-xl border border-cream-300 px-3 py-2.5 text-xs font-semibold text-coffee-700 transition-all hover:bg-cream-50 active:scale-[0.99]"
-      >
-        로그아웃
-      </button>
-    </section>
-  )
-}
-
-function Row({ label, value }) {
-  return (
-    <div className="flex items-baseline justify-between border-b border-cream-200 pb-1.5 last:border-0 last:pb-0">
-      <dt className="text-[12px] text-coffee-600">{label}</dt>
-      <dd className="text-sm font-semibold text-coffee-900">{value}</dd>
+    <div className="flex items-center justify-between gap-3 border-t border-line pt-3 text-sm">
+      <span className="font-bold text-ink-soft">적립률</span>
+      <div className="flex items-center gap-1.5">
+        <input
+          type="number"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') save()
+            if (e.key === 'Escape') cancel()
+          }}
+          min="0.1"
+          max="100"
+          step="0.1"
+          autoFocus
+          className="w-[64px] rounded-[8px] border border-brand bg-pale-soft px-2 py-1 text-right text-sm font-extrabold tabular-nums outline-none"
+        />
+        <span className="font-extrabold">%</span>
+        <button
+          type="button"
+          onClick={save}
+          disabled={!valid}
+          className="rounded-[8px] bg-brand px-2.5 py-1 text-[12px] font-extrabold text-ink transition disabled:opacity-40"
+        >
+          저장
+        </button>
+        <button
+          type="button"
+          onClick={cancel}
+          className="text-[12px] font-bold text-ink-soft hover:text-ink"
+        >
+          취소
+        </button>
+      </div>
     </div>
   )
 }

@@ -1,7 +1,10 @@
 # ADR-0005: 디자인 톤 — 따뜻한 카페 감성
 
-- **Status**: Accepted
+- **Status**: Superseded by [0008](./0008-design-tone-jinscook.md)
 - **Date**: 2026-06-27
+
+> ⚠️ 이 ADR이 정의한 커피 브라운/카라멜 팔레트는 [ADR-0008](./0008-design-tone-jinscook.md)에서
+> "달콤한 진스쿡"(김밥·샌드위치) 크림/옐로우 톤으로 대체되었습니다. 아래 내용은 기록 보존용입니다.
 
 ## Context
 

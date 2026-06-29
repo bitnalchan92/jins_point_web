@@ -1,129 +1,106 @@
 import { useState } from 'react'
+import { Routes, Route, Navigate } from 'react-router-dom'
+import { STORE_NAME } from './lib/data'
+import Logo from './ui/Logo'
 import OwnerLoginScreen from './screens/OwnerLoginScreen'
 import OwnerRewardScreen from './screens/OwnerRewardScreen'
-import OwnerCustomerSearchScreen from './screens/OwnerCustomerSearchScreen'
+import OwnerCustomerManageScreen from './screens/OwnerCustomerManageScreen'
 import OwnerDashboardScreen from './screens/OwnerDashboardScreen'
 import CustomerLandingScreen from './screens/CustomerLandingScreen'
 import CustomerPointScreen from './screens/CustomerPointScreen'
 
-const MODES = [
-  { id: 'owner', label: '사장님', emoji: '🧑‍🍳' },
-  { id: 'customer', label: '손님', emoji: '📱' },
-]
-
 const OWNER_TABS = [
-  { id: 'reward', label: '적립', emoji: '☕' },
-  { id: 'customers', label: '손님 조회', emoji: '👥' },
-  { id: 'dashboard', label: '대시보드', emoji: '📊' },
+  { id: 'reward', label: '☕ 포인트' },
+  { id: 'customers', label: '👥 손님 관리' },
+  { id: 'dashboard', label: '📊 대시보드' },
 ]
 
 export default function App() {
-  const [mode, setMode] = useState('owner')
-  const [customerPhone, setCustomerPhone] = useState(null)
-  const [ownerAuthed, setOwnerAuthed] = useState(false)
-  const [ownerTab, setOwnerTab] = useState('reward')
-
-  const handleModeChange = (next) => {
-    setMode(next)
-    if (next === 'customer') setCustomerPhone(null)
-  }
-
-  const handleLogout = () => {
-    setOwnerAuthed(false)
-    setOwnerTab('reward')
-  }
-
-  let body
-  if (mode === 'owner') {
-    if (!ownerAuthed) {
-      body = <OwnerLoginScreen onLogin={() => setOwnerAuthed(true)} />
-    } else {
-      body = (
-        <>
-          {ownerTab === 'reward' && <OwnerRewardScreen />}
-          {ownerTab === 'customers' && <OwnerCustomerSearchScreen />}
-          {ownerTab === 'dashboard' && <OwnerDashboardScreen onLogout={handleLogout} />}
-          <OwnerTabBar tab={ownerTab} onChange={setOwnerTab} />
-        </>
-      )
-    }
-  } else if (customerPhone) {
-    body = (
-      <CustomerPointScreen
-        phone={customerPhone}
-        onChangePhone={() => setCustomerPhone(null)}
-      />
-    )
-  } else {
-    body = <CustomerLandingScreen onSubmit={setCustomerPhone} />
-  }
-
   return (
-    <div className="min-h-full">
-      <DemoSwitcher mode={mode} onChange={handleModeChange} />
-      {body}
-    </div>
+    <Routes>
+      <Route path="/" element={<CustomerPage />} />
+      <Route path="/admin" element={<AdminPage />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   )
 }
 
-function DemoSwitcher({ mode, onChange }) {
+function CustomerPage() {
+  const [customerPhone, setCustomerPhone] = useState(null)
+
   return (
-    <div className="border-b border-cream-300 bg-cream-50">
-      <div className="mx-auto flex max-w-md items-center justify-between gap-3 px-5 py-2.5">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-coffee-600">
-          데모 화면
-        </span>
-        <div className="flex items-center gap-1 rounded-full bg-white p-1 shadow-[var(--shadow-soft)]">
-          {MODES.map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              onClick={() => onChange(m.id)}
-              className={[
-                'rounded-full px-3 py-1 text-xs font-semibold transition-all',
-                mode === m.id
-                  ? 'bg-coffee-900 text-cream-50'
-                  : 'text-coffee-600 hover:text-coffee-900',
-              ].join(' ')}
-            >
-              <span className="mr-1">{m.emoji}</span>
-              {m.label}
-            </button>
-          ))}
+    <div className="min-h-full pb-20">
+      <div className="flex justify-center px-4 py-6">
+        <div className="relative min-h-[740px] w-full max-w-[430px] overflow-hidden rounded-[30px] border border-line bg-cream shadow-[0_30px_70px_-30px_rgba(70,45,12,.45)]">
+          {customerPhone ? (
+            <CustomerPointScreen
+              phone={customerPhone}
+              onChangePhone={() => setCustomerPhone(null)}
+            />
+          ) : (
+            <CustomerLandingScreen onSubmit={setCustomerPhone} />
+          )}
         </div>
       </div>
     </div>
   )
 }
 
-function OwnerTabBar({ tab, onChange }) {
+function AdminPage() {
+  const [authed, setAuthed] = useState(false)
+  const [ownerTab, setOwnerTab] = useState('reward')
+
+  const logout = () => {
+    setAuthed(false)
+    setOwnerTab('reward')
+  }
+
+  if (!authed) {
+    return (
+      <div className="min-h-full pb-20">
+        <OwnerLoginScreen onLogin={() => setAuthed(true)} />
+      </div>
+    )
+  }
+
   return (
-    <nav
-      aria-label="사장님 메뉴"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-cream-300 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80"
-    >
-      <div className="mx-auto grid max-w-md grid-cols-3 px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-1.5">
-        {OWNER_TABS.map((t) => {
-          const active = tab === t.id
-          return (
+    <div className="min-h-full pb-20">
+      <OwnerApp tab={ownerTab} onTab={setOwnerTab} onLogout={logout} />
+    </div>
+  )
+}
+
+function OwnerApp({ tab, onTab, onLogout }) {
+  return (
+    <div className="mx-auto max-w-[1180px] animate-fade px-[18px] pt-6">
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-[20px] border border-line bg-card py-3 pl-[18px] pr-3.5 shadow-[var(--shadow-soft)]">
+        <div className="flex items-center gap-3">
+          <Logo size="md" />
+          <div>
+            <div className="text-base font-extrabold tracking-tight">{STORE_NAME}</div>
+            <div className="text-[11.5px] font-bold text-ink-soft">사장님 모드 · 포인트 관리</div>
+          </div>
+        </div>
+        <div className="flex gap-1.5 rounded-[14px] bg-[#f5eedf] p-[5px]">
+          {OWNER_TABS.map((t) => (
             <button
               key={t.id}
               type="button"
-              onClick={() => onChange(t.id)}
+              onClick={() => onTab(t.id)}
               className={[
-                'flex flex-col items-center gap-0.5 rounded-xl px-2 py-1.5 transition-all active:scale-95',
-                active ? 'text-caramel-600' : 'text-coffee-600 hover:text-coffee-900',
+                'rounded-[10px] px-4 py-2.5 text-[13.5px] font-extrabold transition-all',
+                tab === t.id ? 'bg-card text-ink shadow-[0_4px_12px_-5px_rgba(70,45,12,.4)]' : 'text-ink-soft',
               ].join(' ')}
-              aria-current={active ? 'page' : undefined}
             >
-              <span className="text-lg leading-none">{t.emoji}</span>
-              <span className={['text-[11px] font-semibold', active && 'font-bold'].join(' ')}>
-                {t.label}
-              </span>
+              {t.label}
             </button>
-          )
-        })}
+          ))}
+        </div>
       </div>
-    </nav>
+
+      {tab === 'reward' && <OwnerRewardScreen />}
+      {tab === 'customers' && <OwnerCustomerManageScreen />}
+      {tab === 'dashboard' && <OwnerDashboardScreen onLogout={onLogout} />}
+    </div>
   )
 }

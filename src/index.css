@@ -1,25 +1,60 @@
 @import "tailwindcss";
 
 @theme {
-  --color-cream-50: #fdfaf5;
-  --color-cream-100: #fbf7f1;
-  --color-cream-200: #f5ecdd;
-  --color-cream-300: #e8ddd0;
-  --color-coffee-400: #c4a47a;
-  --color-coffee-500: #a07d52;
-  --color-coffee-600: #8b6f47;
-  --color-coffee-700: #5d4226;
-  --color-coffee-900: #3d2817;
-  --color-caramel-400: #e89968;
-  --color-caramel-500: #d97338;
-  --color-caramel-600: #b85a26;
-  --color-leaf-500: #7a9e5b;
+  /* ── 베이스 ──────────────────────────────── */
+  --color-cream: #fcf7ec; /* 종이 같은 배경 */
+  --color-card: #ffffff; /* 카드 표면 */
+  --color-line: #eee3cf; /* 경계선 */
+
+  /* ── 텍스트 ──────────────────────────────── */
+  --color-ink: #241b12; /* 메인 텍스트 */
+  --color-ink-soft: #9a8975; /* 보조 텍스트 */
+
+  /* ── 브랜드 (옐로우) ──────────────────────── */
+  --color-brand: #ffc81f; /* 메인 브랜드 */
+  --color-brand-dark: #f0a91a; /* 강조 / 숫자 */
+  --color-pale: #fff3c9; /* 옅은 브랜드 면 */
+  --color-pale-soft: #fffbec; /* 입력 배경 */
+
+  /* ── 보조 (성공/리워드) ───────────────────── */
+  --color-leaf: #5e9c53;
+  --color-leaf-bg: #e9f2e0;
+
+  /* ── 위험 ────────────────────────────────── */
+  --color-danger: #d8553a;
 
   --font-sans: "Pretendard", "Apple SD Gothic Neo", system-ui, -apple-system, sans-serif;
-  --font-display: "Gmarket Sans", "Pretendard", system-ui, sans-serif;
 
-  --shadow-soft: 0 4px 16px -4px rgba(93, 66, 38, 0.12), 0 2px 6px -2px rgba(93, 66, 38, 0.08);
-  --shadow-lift: 0 12px 32px -8px rgba(93, 66, 38, 0.18), 0 4px 12px -4px rgba(93, 66, 38, 0.1);
+  /* ── 그림자 ──────────────────────────────── */
+  --shadow-soft: 0 8px 24px -22px rgba(70, 45, 12, 0.5);
+  --shadow-card: 0 12px 34px -26px rgba(70, 45, 12, 0.6);
+  --shadow-lift: 0 18px 40px -22px rgba(240, 169, 26, 0.85);
+
+  /* ── 모션 ────────────────────────────────── */
+  --animate-fade: jp-fade 0.4s ease both;
+  --animate-pop: jp-pop 0.5s ease both;
+  --animate-shake: jp-shake 0.4s both;
+
+  @keyframes jp-pop {
+    0% { transform: scale(0.8); opacity: 0; }
+    60% { transform: scale(1.06); }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  @keyframes jp-shake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-7px); }
+    40%, 80% { transform: translateX(7px); }
+  }
+  @keyframes jp-fade {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes jp-toast {
+    0% { transform: translateY(24px); opacity: 0; }
+    12% { transform: translateY(0); opacity: 1; }
+    88% { transform: translateY(0); opacity: 1; }
+    100% { transform: translateY(-8px); opacity: 0; }
+  }
 }
 
 @font-face {
@@ -27,7 +62,8 @@
   font-weight: 45 920;
   font-style: normal;
   font-display: swap;
-  src: url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/PretendardVariable.woff2") format("woff2-variations");
+  src: url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/PretendardVariable.woff2")
+    format("woff2-variations");
 }
 
 html,
@@ -38,9 +74,20 @@ body,
 
 body {
   margin: 0;
-  background: var(--color-cream-100);
-  color: var(--color-coffee-900);
+  color: var(--color-ink);
   font-family: var(--font-sans);
+  background: radial-gradient(
+    120% 80% at 50% -10%,
+    #fff7dc 0%,
+    var(--color-cream) 46%,
+    #f6efe0 100%
+  );
+  background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+}
+
+::placeholder {
+  color: #c3b5a2;
 }
