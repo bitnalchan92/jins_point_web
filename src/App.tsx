@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { STORE_NAME } from './lib/data'
+import type { BalanceResponse } from './lib/contracts'
+import { StoreProvider } from './store'
 import Logo from './ui/Logo'
 import OwnerLoginScreen from './screens/OwnerLoginScreen'
 import OwnerRewardScreen from './screens/OwnerRewardScreen'
@@ -34,19 +36,16 @@ export default function App() {
 }
 
 function CustomerPage() {
-  const [customerPhone, setCustomerPhone] = useState<string | null>(null)
+  const [balance, setBalance] = useState<BalanceResponse | null>(null)
 
   return (
     <div className="min-h-full pb-20">
       <div className="flex justify-center px-4 py-6">
         <div className="relative min-h-[740px] w-full max-w-[430px] overflow-hidden rounded-[30px] border border-line bg-cream shadow-[0_30px_70px_-30px_rgba(70,45,12,.45)]">
-          {customerPhone ? (
-            <CustomerPointScreen
-              phone={customerPhone}
-              onChangePhone={() => setCustomerPhone(null)}
-            />
+          {balance ? (
+            <CustomerPointScreen balance={balance} onChangePhone={() => setBalance(null)} />
           ) : (
-            <CustomerLandingScreen onSubmit={setCustomerPhone} />
+            <CustomerLandingScreen onSuccess={setBalance} />
           )}
         </div>
       </div>
@@ -54,7 +53,18 @@ function CustomerPage() {
   )
 }
 
+// Owner screens still rely on the demo StoreProvider until Tasks 6–7 replace it
+// with the production owner provider. Scope it to the /admin route only so the
+// customer route never touches demo customers or findCustomer().
 function AdminPage() {
+  return (
+    <StoreProvider>
+      <AdminPageInner />
+    </StoreProvider>
+  )
+}
+
+function AdminPageInner() {
   const [authed, setAuthed] = useState(false)
   const [ownerTab, setOwnerTab] = useState<OwnerTab>('reward')
 

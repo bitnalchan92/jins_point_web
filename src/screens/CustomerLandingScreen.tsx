@@ -1,18 +1,70 @@
-import { useState } from 'react'
-import { STORE_NAME, STORE_TAGLINE, demoChips } from '../lib/data'
-import { formatPhone, isValidPhone, onlyDigits } from '../lib/format'
+import { useEffect, useState } from 'react'
+import { STORE_NAME, STORE_TAGLINE } from '../lib/data'
+import type { BalanceResponse } from '../lib/contracts'
+import { formatPhone, isValidPhone } from '../lib/format'
+import { useBalanceLookup } from '../customer/useBalanceLookup'
+import TurnstileWidget from '../customer/TurnstileWidget'
 import Logo from '../ui/Logo'
 
 interface CustomerLandingScreenProps {
-  onSubmit: (phone: string) => void
+  onSuccess: (balance: BalanceResponse) => void
 }
 
-export default function CustomerLandingScreen({ onSubmit }: CustomerLandingScreenProps) {
+type ErrorCode = 'INVALID_REQUEST' | 'RATE_LIMITED' | 'UNAVAILABLE'
+
+const ERROR_COPY: Record<ErrorCode, { title: string; body: string }> = {
+  INVALID_REQUEST: {
+    title: '조회할 수 없어요',
+    body: '전화번호를 다시 확인한 뒤 시도해 주세요.',
+  },
+  RATE_LIMITED: {
+    title: '잠시 후 다시 시도해 주세요',
+    body: '조회 요청이 많아 잠시 제한되었어요. 잠시 후 다시 시도해 주세요.',
+  },
+  UNAVAILABLE: {
+    title: '일시적으로 연결이 어려워요',
+    body: '서비스 연결이 원활하지 않아요. 잠시 후 다시 시도해 주세요.',
+  },
+}
+
+export default function CustomerLandingScreen({ onSuccess }: CustomerLandingScreenProps) {
+  const { state, lookup, reset } = useBalanceLookup()
   const [phone, setPhone] = useState('')
-  const valid = isValidPhone(phone)
+  const [token, setToken] = useState<string | null>(null)
+  // Bumping this remounts the Turnstile widget to force a fresh, single-use token.
+  const [widgetKey, setWidgetKey] = useState(0)
+
+  const validPhone = isValidPhone(phone)
+  const loading = state.status === 'loading'
+  const error = state.status === 'error' ? state.code : null
+  const canSubmit = validPhone && token !== null && !loading
+
+  useEffect(() => {
+    if (state.status === 'success') {
+      onSuccess(state.data)
+    }
+  }, [state, onSuccess])
 
   const submit = () => {
-    if (valid) onSubmit(onlyDigits(phone))
+    if (!canSubmit || token === null) return
+    void lookup(phone, token)
+  }
+
+  // Editing the number invalidates a captured single-use token and clears any
+  // previous error/result so each phone number starts a clean lookup.
+  const handlePhoneChange = (raw: string) => {
+    setPhone(formatPhone(raw))
+    if (token !== null) {
+      setToken(null)
+      setWidgetKey((key) => key + 1)
+    }
+    if (state.status !== 'idle') reset()
+  }
+
+  const handleRetry = () => {
+    reset()
+    setToken(null)
+    setWidgetKey((key) => key + 1)
   }
 
   return (
@@ -32,7 +84,10 @@ export default function CustomerLandingScreen({ onSubmit }: CustomerLandingScree
         }}
         className="rounded-[22px] border border-line bg-card p-5 shadow-[var(--shadow-card)]"
       >
-        <label htmlFor="cust-phone" className="text-[12.5px] font-extrabold tracking-wide text-ink-soft">
+        <label
+          htmlFor="cust-phone"
+          className="text-[12.5px] font-extrabold tracking-wide text-ink-soft"
+        >
           전화번호
         </label>
         <input
@@ -40,55 +95,64 @@ export default function CustomerLandingScreen({ onSubmit }: CustomerLandingScree
           type="tel"
           inputMode="numeric"
           value={phone}
-          onChange={(e) => setPhone(formatPhone(e.target.value))}
+          onChange={(e) => handlePhoneChange(e.target.value)}
           placeholder="010-0000-0000"
           autoFocus
-          className="mt-2.5 w-full rounded-[14px] border-[1.5px] border-line bg-pale-soft px-4 py-[15px] text-center text-[21px] font-bold tracking-wide tabular-nums text-ink outline-none transition-colors focus:border-brand"
+          disabled={loading}
+          className="mt-2.5 w-full rounded-[14px] border-[1.5px] border-line bg-pale-soft px-4 py-[15px] text-center text-[21px] font-bold tracking-wide tabular-nums text-ink outline-none transition-colors focus:border-brand disabled:opacity-60"
         />
+
+        <div className="mt-3.5 flex justify-center">
+          <TurnstileWidget
+            key={widgetKey}
+            onToken={setToken}
+            onExpire={() => setToken(null)}
+            onError={() => setToken(null)}
+          />
+        </div>
+
         <button
           type="submit"
-          disabled={!valid}
+          disabled={!canSubmit}
+          aria-busy={loading}
           className={[
             'mt-3.5 w-full rounded-[14px] py-[15px] text-[15.5px] font-extrabold transition active:scale-[0.99]',
-            valid
+            canSubmit
               ? 'bg-ink text-white shadow-[0_12px_24px_-12px_rgba(36,27,18,.5)]'
               : 'cursor-not-allowed bg-[#e7dcc8] text-[#b4a48e]',
           ].join(' ')}
         >
-          내 포인트 보기
+          {loading ? '조회 중…' : '내 포인트 보기'}
         </button>
+
+        {loading && (
+          <div
+            role="status"
+            className="mt-3 text-center text-[12.5px] font-bold text-ink-soft"
+          >
+            포인트를 불러오는 중이에요…
+          </div>
+        )}
       </form>
 
-      <section className="mt-6">
-        <div className="text-center text-[11px] font-extrabold tracking-[0.14em] text-ink-soft">
-          DEMO 빠른 입력
+      {error && (
+        <div
+          role="alert"
+          className="mt-5 rounded-[18px] border border-danger/30 bg-danger/5 p-[18px] text-center"
+        >
+          <div className="text-[14px] font-extrabold text-danger">{ERROR_COPY[error].title}</div>
+          <p className="mt-1.5 text-[12.5px] font-semibold leading-relaxed text-ink-soft">
+            {ERROR_COPY[error].body}
+          </p>
+          <button
+            type="button"
+            onClick={handleRetry}
+            className="mt-3.5 rounded-full border border-line bg-card px-5 py-2 text-[13px] font-extrabold text-ink transition hover:border-brand"
+          >
+            다시 시도
+          </button>
         </div>
-        <div className="mt-3 flex flex-col gap-[9px]">
-          {demoChips.map((chip) => {
-            const isRegular = chip.tag === '단골'
-            return (
-              <button
-                key={chip.phone}
-                type="button"
-                onClick={() => setPhone(formatPhone(chip.phone))}
-                className="flex w-full items-center justify-between rounded-[14px] border border-line bg-card px-4 py-[13px] text-left transition hover:border-brand hover:bg-pale-soft"
-              >
-                <span className="text-[15px] font-bold tracking-wide tabular-nums">
-                  {formatPhone(chip.phone)}
-                </span>
-                <span
-                  className={[
-                    'rounded-full px-2.5 py-1 text-[11px] font-extrabold',
-                    isRegular ? 'bg-pale text-brand-dark' : 'bg-leaf-bg text-leaf',
-                  ].join(' ')}
-                >
-                  {chip.tag}
-                </span>
-              </button>
-            )
-          })}
-        </div>
-      </section>
+      )}
     </div>
   )
 }
