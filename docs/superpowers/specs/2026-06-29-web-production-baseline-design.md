@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-29
 
-**Status:** Proposed — written review pending
+**Status:** Approved for implementation planning
 
 ## Goal
 
