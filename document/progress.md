@@ -15,10 +15,10 @@
 
 | 화면 | 상태 | 파일 | 핵심 |
 |------|:----:|------|------|
-| 로그인 | ✅ | `OwnerLoginScreen.jsx` | 4자리 PIN, 점 시각화, 온스크린 키패드, DEMO 자동 입력, shake 오류 애니메이션 |
-| 포인트 (적립·사용) | ✅ | `OwnerRewardScreen.jsx` | 뒷번호 4자리 3단계 흐름(조회→선택→금액), POS 2단 레이아웃, 1,000P 단위 사용 제약, 토스트 |
-| 손님 관리 | ✅ | `OwnerCustomerManageScreen.jsx` | 이름/번호 검색, 카드 그리드, 신규 손님 추가 (이름+전화번호), Toast 완료 알림 |
-| 대시보드 | ✅ | `OwnerDashboardScreen.jsx` | KPI 3종(오늘 적립/손님 수/총 포인트) 실시간, 가게 정보, 단골 TOP 3, 적립률 인라인 수정, 로그아웃 |
+| 로그인 | ✅ | `OwnerLoginScreen.tsx` | 4자리 PIN, 점 시각화, 온스크린 키패드, DEMO 자동 입력, shake 오류 애니메이션 |
+| 포인트 (적립·사용) | ✅ | `OwnerRewardScreen.tsx` | 뒷번호 4자리 3단계 흐름(조회→선택→금액), POS 2단 레이아웃, 1,000P 단위 사용 제약, 토스트 |
+| 손님 관리 | ✅ | `OwnerCustomerManageScreen.tsx` | 이름/번호 검색, 카드 그리드, 신규 손님 추가 (이름+전화번호), Toast 완료 알림 |
+| 대시보드 | ✅ | `OwnerDashboardScreen.tsx` | KPI 3종(오늘 적립/손님 수/총 포인트) 실시간, 가게 정보, 단골 TOP 3, 적립률 인라인 수정, 로그아웃 |
 
 로그인 후 **상단 탭바**로 포인트·손님 관리·대시보드 전환 (와이드 POS 레이아웃, max-w-1180px).
 
@@ -26,8 +26,8 @@
 
 | 화면 | 상태 | 파일 | 핵심 |
 |------|:----:|------|------|
-| 랜딩 | ✅ | `CustomerLandingScreen.jsx` | 🍙 브랜드 카드 + 전화번호 입력 + DEMO 빠른 입력 칩 (단골 2 / 신규 1) |
-| 내 포인트 조회 | ✅ | `CustomerPointScreen.jsx` | 옐로우 그라디언트 히어로, 포인트 잔액, 적립·사용 내역(날짜+포인트), 신규 빈 상태 |
+| 랜딩 | ✅ | `CustomerLandingScreen.tsx` | 🍙 브랜드 카드 + 전화번호 입력 + DEMO 빠른 입력 칩 (단골 2 / 신규 1) |
+| 내 포인트 조회 | ✅ | `CustomerPointScreen.tsx` | 옐로우 그라디언트 히어로, 포인트 잔액, 적립·사용 내역(날짜+포인트), 신규 빈 상태 |
 
 조회 화면 ↻ 버튼으로 랜딩 복귀.
 
@@ -67,11 +67,11 @@
              └─ ↻ → 다시 랜딩
 ```
 
-공유 상태: `src/store.jsx` (React Context). 사장님이 적립/사용하면 손님 조회·대시보드에 실시간 반영됩니다.
+공유 상태: `src/store.tsx` (React Context). 사장님이 적립/사용하면 손님 조회·대시보드에 실시간 반영됩니다.
 
 ## 데이터 시드
 
-모든 화면이 `src/lib/data.js`의 **단일 데이터셋**을 공유합니다.
+모든 화면이 `src/lib/data.ts`의 **단일 데이터셋**을 공유합니다.
 
 ### 상수
 
@@ -109,7 +109,7 @@
 
 **왜**: 가장 큰 단점("새로고침하면 다 사라짐")을 해결.
 
-**무엇**: `store.jsx`의 `overrides`·`rewardLog`·`newCustomers`·`rate`를 localStorage에 저장.
+**무엇**: `store.tsx`의 `overrides`·`rewardLog`·`newCustomers`·`rate`를 localStorage에 저장.
 
 **ADR 필요**: 영속화 전략 (localStorage vs IndexedDB).
 
@@ -148,7 +148,7 @@
 
 ### 인프라
 
-- [ ] TypeScript 도입 (ADR-0001 후속)
+- [x] strict TypeScript 도입 (ADR-0001 후속)
 - [ ] 백엔드 결정 (Firebase/Supabase 등)
 
 ## 검증 상태
@@ -160,7 +160,7 @@
 | `npm run lint` (oxlint) | ✅ 실제 이슈 0건 |
 | 수동 테스트 가이드 | ✅ 갱신됨 |
 | 자동화 테스트 | ❌ 미도입 |
-| 타입 체크 | ❌ JS, 미적용 |
+| 타입 체크 | ✅ `strict: true`, `npm run typecheck` 통과 |
 
 ## 커밋 이력 (요약)
 

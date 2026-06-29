@@ -1,8 +1,52 @@
 import { useRef, useState } from 'react'
+import type { Customer } from '../lib/data'
 import { comma, onlyDigits } from '../lib/format'
 import { useStore } from '../store'
 import Keypad, { numericKeys } from '../ui/Keypad'
 import Toast from '../ui/Toast'
+import type { ToastConfig } from '../ui/Toast'
+
+type RewardMode = 'earn' | 'use'
+type RewardStep = 'search' | 'select' | 'amount'
+
+interface SearchStepProps {
+  suffix: string
+  onKey: (value: string) => void
+  onSearch: () => void
+  mode: RewardMode
+}
+
+interface SelectStepProps {
+  matches: Customer[]
+  onSelect: (customer: Customer) => void
+  onBack: () => void
+  suffix: string
+}
+
+interface AmountStepProps {
+  mode: RewardMode
+  resolved: Customer
+  amountNumber: number
+  earn: number
+  notEnough: boolean | null
+  notUnitValid: boolean
+  rate: number
+  onKey: (value: string) => void
+  onEarnChip: (delta: number) => void
+  onUseChip: (delta: number) => void
+  onBack: () => void
+}
+
+interface PreviewCardProps {
+  mode: RewardMode
+  step: RewardStep
+  resolved: Customer | null
+  amountNumber: number
+  earn: number
+  notEnough: boolean | null
+  notUnitValid: boolean
+  rate: number
+}
 
 const EARN_CHIPS = [
   { label: '+1,000', delta: 1000 },
@@ -19,14 +63,14 @@ const USE_CHIPS = [
 // 단계: 'search' → 손님 4자리 입력, 'select' → 복수 매칭 선택, 'amount' → 금액 입력
 export default function OwnerRewardScreen() {
   const { customers, rewardLog, addReward, redeemPoints, rate } = useStore()
-  const [mode, setMode] = useState('earn') // 'earn' | 'use'
-  const [step, setStep] = useState('search') // 'search' | 'select' | 'amount'
+  const [mode, setMode] = useState<RewardMode>('earn') // 'earn' | 'use'
+  const [step, setStep] = useState<RewardStep>('search') // 'search' | 'select' | 'amount'
   const [suffix, setSuffix] = useState('')
-  const [matches, setMatches] = useState([])
-  const [resolved, setResolved] = useState(null) // 선택된 손님
+  const [matches, setMatches] = useState<Customer[]>([])
+  const [resolved, setResolved] = useState<Customer | null>(null) // 선택된 손님
   const [amount, setAmount] = useState('')
-  const [toast, setToast] = useState(null)
-  const timer = useRef(null)
+  const [toast, setToast] = useState<ToastConfig | null>(null)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const amountNumber = Number(amount) || 0
   const earn = Math.floor(amountNumber * rate)
@@ -40,7 +84,7 @@ export default function OwnerRewardScreen() {
     (mode === 'earn' || !notEnough)
 
   // 4자리 키패드 입력
-  const onSuffixKey = (value) => {
+  const onSuffixKey = (value: string) => {
     setSuffix((s) => {
       if (value === 'back') return s.slice(0, -1)
       if (s.length >= 4) return s
@@ -55,38 +99,38 @@ export default function OwnerRewardScreen() {
     const found = customers.filter((c) => c.phone.endsWith(clean))
     setMatches(found)
     if (found.length === 1) {
-      setResolved(found[0])
+      setResolved(found[0]!)
       setStep('amount')
     } else {
       setStep('select')
     }
   }
 
-  const selectCustomer = (customer) => {
+  const selectCustomer = (customer: Customer) => {
     setResolved(customer)
     setStep('amount')
   }
 
-  const onAmountKey = (value) => {
+  const onAmountKey = (value: string) => {
     setAmount((a) => {
       const next = value === 'back' ? a.slice(0, -1) : value === '00' ? `${a}00` : a + value
       return next.replace(/^0+/, '').slice(0, 7)
     })
   }
 
-  const onEarnChip = (delta) => {
+  const onEarnChip = (delta: number) => {
     if (delta === 0) return setAmount('')
     setAmount((a) => String(Math.min(9999999, (Number(a) || 0) + delta)))
   }
 
-  const onUseChip = (delta) => {
+  const onUseChip = (delta: number) => {
     if (delta === 0) return setAmount('')
     setAmount((a) => String(Math.min(resolved?.points ?? 9999999, (Number(a) || 0) + delta)))
   }
 
-  const showToast = (config) => {
+  const showToast = (config: ToastConfig) => {
     setToast(config)
-    clearTimeout(timer.current)
+    clearTimeout(timer.current!)
     timer.current = setTimeout(() => setToast(null), 2600)
   }
 
@@ -98,7 +142,7 @@ export default function OwnerRewardScreen() {
     setStep('search')
   }
 
-  const switchMode = (next) => {
+  const switchMode = (next: RewardMode) => {
     if (next === mode) return
     setMode(next)
     resetAll()
@@ -176,7 +220,7 @@ export default function OwnerRewardScreen() {
           {step === 'amount' && (
             <AmountStep
               mode={mode}
-              resolved={resolved}
+              resolved={resolved!}
               amountNumber={amountNumber}
               earn={earn}
               notEnough={notEnough}
@@ -255,7 +299,7 @@ export default function OwnerRewardScreen() {
 }
 
 // ── STEP 1: 4자리 뒷번호 검색 ────────────────────────────────────────
-function SearchStep({ suffix, onKey, onSearch, mode }) {
+function SearchStep({ suffix, onKey, onSearch, mode }: SearchStepProps) {
   const digits = onlyDigits(suffix)
   const filled = digits.length === 4
 
@@ -300,7 +344,7 @@ function SearchStep({ suffix, onKey, onSearch, mode }) {
 }
 
 // ── STEP 2: 복수 매칭 선택 ───────────────────────────────────────────
-function SelectStep({ matches, onSelect, onBack, suffix }) {
+function SelectStep({ matches, onSelect, onBack, suffix }: SelectStepProps) {
   return (
     <>
       <div className="mb-[18px] flex items-center gap-2">
@@ -359,7 +403,19 @@ function SelectStep({ matches, onSelect, onBack, suffix }) {
 }
 
 // ── STEP 3: 금액 입력 ────────────────────────────────────────────────
-function AmountStep({ mode, resolved, amountNumber, earn, notEnough, notUnitValid, rate, onKey, onEarnChip, onUseChip, onBack }) {
+function AmountStep({
+  mode,
+  resolved,
+  amountNumber,
+  earn,
+  notEnough,
+  notUnitValid,
+  rate,
+  onKey,
+  onEarnChip,
+  onUseChip,
+  onBack,
+}: AmountStepProps) {
   return (
     <>
       {/* 헤더: 손님 이름 + 보유 포인트 */}
@@ -442,7 +498,16 @@ function AmountStep({ mode, resolved, amountNumber, earn, notEnough, notUnitVali
   )
 }
 
-function PreviewCard({ mode, step, resolved, amountNumber, earn, notEnough, notUnitValid, rate }) {
+function PreviewCard({
+  mode,
+  step,
+  resolved,
+  amountNumber,
+  earn,
+  notEnough,
+  notUnitValid,
+  rate,
+}: PreviewCardProps) {
   if (!resolved) {
     return (
       <div className="flex min-h-[188px] flex-col items-center justify-center rounded-[22px] bg-[linear-gradient(158deg,var(--color-brand),var(--color-brand-dark))] p-6 text-center opacity-80 shadow-[var(--shadow-lift)]">

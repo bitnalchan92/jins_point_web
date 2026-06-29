@@ -19,15 +19,15 @@
 - ✅ **랜딩** (브랜드 카드 + 전화번호 입력 + 데모 빠른 입력 칩)
 - ✅ **내 포인트 조회** (큰 포인트 히어로, 다음 무료 메뉴까지 프로그레스, 방문 도장 10칸, 적립/사용 내역, 신규 손님 빈 상태)
 
-> 이번 단계는 **UI 목업**입니다. 적립은 세션 메모리(`src/store.jsx`)에만 반영되며, 새로고침하면 초기화됩니다.
+> 이번 단계는 **UI 목업**입니다. 적립은 세션 메모리(`src/store.tsx`)에만 반영되며, 새로고침하면 초기화됩니다.
 > 사장님/손님 모드는 페이지 상단의 "DEMO" 토글로 전환합니다 ([ADR-0006](./document/adr/0006-demo-mode-switcher.md)).
 
 ## 기술 스택
 
 - **Vite 8** + **React 19**
 - **Tailwind CSS v4** (`@tailwindcss/vite`, `@theme` 토큰)
-- 상태 공유: React Context (`src/store.jsx`) — 적립이 조회·대시보드에 실시간 반영
-- 자바스크립트 (현 단계 TS 미도입)
+- 상태 공유: React Context (`src/store.tsx`) — 적립이 조회·대시보드에 실시간 반영
+- **TypeScript** (`strict: true`)
 - 외부 폰트: Pretendard (CDN)
 
 자세한 결정 배경은 [ADR](./document/adr) 참고.
@@ -49,6 +49,7 @@ npm run dev
 | `npm run build` | 프로덕션 빌드 |
 | `npm run preview` | 빌드 결과 로컬 프리뷰 |
 | `npm run lint` | oxlint |
+| `npm run typecheck` | strict TypeScript 타입 검사 |
 
 ## 디자인 톤
 
@@ -73,26 +74,26 @@ npm run dev
 │   └── prototype.html          # 디자인 레퍼런스 (번들된 목업)
 ├── public/
 ├── src/
-│   ├── App.jsx                 # 데모 모드 스위처 + 화면 전환
-│   ├── store.jsx               # 공유 상태 (손님 포인트, 적립 로그)
+│   ├── App.tsx                 # 데모 모드 스위처 + 화면 전환
+│   ├── store.tsx               # 공유 상태 (손님 포인트, 적립 로그)
 │   ├── index.css               # 디자인 토큰 (@theme) + 모션
-│   ├── main.jsx
+│   ├── main.tsx
 │   ├── lib/
-│   │   ├── data.js             # 단일 데이터셋 (손님, 대시보드, 상수)
-│   │   └── format.js           # 전화번호/금액/숫자 포맷
+│   │   ├── data.ts             # 단일 데이터셋 (손님, 대시보드, 상수)
+│   │   └── format.ts           # 전화번호/금액/숫자 포맷
 │   ├── ui/
-│   │   ├── Logo.jsx            # 🍙 브랜드 로고
-│   │   ├── Keypad.jsx          # POS 숫자/PIN 키패드
-│   │   └── Toast.jsx           # 적립 완료 토스트
+│   │   ├── Logo.tsx            # 🍙 브랜드 로고
+│   │   ├── Keypad.tsx          # POS 숫자/PIN 키패드
+│   │   └── Toast.tsx           # 적립 완료 토스트
 │   └── screens/
-│       ├── OwnerLoginScreen.jsx           # 사장님 — 로그인 (PIN 키패드)
-│       ├── OwnerRewardScreen.jsx          # 사장님 — 적립 (POS)
-│       ├── OwnerCustomerSearchScreen.jsx  # 사장님 — 손님 조회
-│       ├── OwnerDashboardScreen.jsx       # 사장님 — 대시보드
-│       ├── CustomerLandingScreen.jsx      # 손님 — 랜딩
-│       └── CustomerPointScreen.jsx        # 손님 — 내 포인트 조회
+│       ├── OwnerLoginScreen.tsx           # 사장님 — 로그인 (PIN 키패드)
+│       ├── OwnerRewardScreen.tsx          # 사장님 — 적립 (POS)
+│       ├── OwnerCustomerSearchScreen.tsx  # 사장님 — 손님 조회
+│       ├── OwnerDashboardScreen.tsx       # 사장님 — 대시보드
+│       ├── CustomerLandingScreen.tsx      # 손님 — 랜딩
+│       └── CustomerPointScreen.tsx        # 손님 — 내 포인트 조회
 ├── index.html
-└── vite.config.js
+└── vite.config.ts
 ```
 
 ## 사용해보기

@@ -3,11 +3,15 @@ import { OWNER_PIN, STORE_NAME } from '../lib/data'
 import Logo from '../ui/Logo'
 import Keypad, { pinKeys } from '../ui/Keypad'
 
-export default function OwnerLoginScreen({ onLogin }) {
+interface OwnerLoginScreenProps {
+  onLogin: () => void
+}
+
+export default function OwnerLoginScreen({ onLogin }: OwnerLoginScreenProps) {
   const [pin, setPin] = useState('')
   const [error, setError] = useState(false)
 
-  const press = (value) => {
+  const press = (value: string) => {
     setError(false)
     if (value === 'back') return setPin((p) => p.slice(0, -1))
     if (value === 'clear') return setPin('')

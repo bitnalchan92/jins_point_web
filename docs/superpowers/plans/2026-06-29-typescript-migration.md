@@ -387,7 +387,7 @@ interface CustomerCardProps {
 }
 ```
 
-Type `expanded` as `string | null`, `toast` as `ToastConfig | null`, `nameRef` as `HTMLInputElement | null`, and the timer as `ReturnType<typeof setTimeout> | undefined`.
+Type `expanded` as `string | null`, `toast` as `ToastConfig | null`, `nameRef` as `HTMLInputElement | null`, and the timer as `ReturnType<typeof setTimeout> | null`. Keep the original `null` timer initialization and use a compile-time-only non-null assertion when passing it to `clearTimeout`.
 
 Apply the same `CustomerCardProps` contract and `string | null` expanded state to the retained, currently unreferenced `OwnerCustomerSearchScreen.tsx`; do not delete or connect that screen as part of this migration.
 

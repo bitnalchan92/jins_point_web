@@ -1,20 +1,34 @@
 import { useMemo, useRef, useState } from 'react'
 import { REWARD_THRESHOLD } from '../lib/data'
+import type { Customer } from '../lib/data'
 import { comma, formatPhone, onlyDigits } from '../lib/format'
 import { useStore } from '../store'
+import type { StoreContextValue } from '../store'
 import Toast from '../ui/Toast'
+import type { ToastConfig } from '../ui/Toast'
+
+interface AddCustomerFormProps {
+  onDone: (name: string) => void
+  addCustomer: StoreContextValue['addCustomer']
+}
+
+interface CustomerCardProps {
+  customer: Customer
+  open: boolean
+  onToggle: () => void
+}
 
 export default function OwnerCustomerManageScreen() {
   const { customers, addCustomer } = useStore()
   const [query, setQuery] = useState('')
-  const [expanded, setExpanded] = useState(null)
+  const [expanded, setExpanded] = useState<string | null>(null)
   const [showAddForm, setShowAddForm] = useState(false)
-  const [toast, setToast] = useState(null)
-  const timer = useRef(null)
+  const [toast, setToast] = useState<ToastConfig | null>(null)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const showToast = (config) => {
+  const showToast = (config: ToastConfig) => {
     setToast(config)
-    clearTimeout(timer.current)
+    clearTimeout(timer.current!)
     timer.current = setTimeout(() => setToast(null), 2600)
   }
 
@@ -97,13 +111,13 @@ export default function OwnerCustomerManageScreen() {
   )
 }
 
-function AddCustomerForm({ onDone, addCustomer }) {
+function AddCustomerForm({ onDone, addCustomer }: AddCustomerFormProps) {
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [error, setError] = useState('')
-  const nameRef = useRef(null)
+  const nameRef = useRef<HTMLInputElement | null>(null)
 
-  const formatPhoneInput = (val) => {
+  const formatPhoneInput = (val: string) => {
     const d = onlyDigits(val).slice(0, 11)
     if (d.length <= 3) return d
     if (d.length <= 7) return `${d.slice(0, 3)}-${d.slice(3)}`
@@ -171,7 +185,7 @@ function AddCustomerForm({ onDone, addCustomer }) {
   )
 }
 
-function CustomerCard({ customer, open, onToggle }) {
+function CustomerCard({ customer, open, onToggle }: CustomerCardProps) {
   const within = customer.points % REWARD_THRESHOLD
   const remain = within === 0 && customer.points > 0 ? 0 : REWARD_THRESHOLD - within
 

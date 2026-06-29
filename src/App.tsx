@@ -9,7 +9,15 @@ import OwnerDashboardScreen from './screens/OwnerDashboardScreen'
 import CustomerLandingScreen from './screens/CustomerLandingScreen'
 import CustomerPointScreen from './screens/CustomerPointScreen'
 
-const OWNER_TABS = [
+type OwnerTab = 'reward' | 'customers' | 'dashboard'
+
+interface OwnerAppProps {
+  tab: OwnerTab
+  onTab: (tab: OwnerTab) => void
+  onLogout: () => void
+}
+
+const OWNER_TABS: { id: OwnerTab; label: string }[] = [
   { id: 'reward', label: '☕ 포인트' },
   { id: 'customers', label: '👥 손님 관리' },
   { id: 'dashboard', label: '📊 대시보드' },
@@ -26,7 +34,7 @@ export default function App() {
 }
 
 function CustomerPage() {
-  const [customerPhone, setCustomerPhone] = useState(null)
+  const [customerPhone, setCustomerPhone] = useState<string | null>(null)
 
   return (
     <div className="min-h-full pb-20">
@@ -48,7 +56,7 @@ function CustomerPage() {
 
 function AdminPage() {
   const [authed, setAuthed] = useState(false)
-  const [ownerTab, setOwnerTab] = useState('reward')
+  const [ownerTab, setOwnerTab] = useState<OwnerTab>('reward')
 
   const logout = () => {
     setAuthed(false)
@@ -70,7 +78,7 @@ function AdminPage() {
   )
 }
 
-function OwnerApp({ tab, onTab, onLogout }) {
+function OwnerApp({ tab, onTab, onLogout }: OwnerAppProps) {
   return (
     <div className="mx-auto max-w-[1180px] animate-fade px-[18px] pt-6">
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-[20px] border border-line bg-card py-3 pl-[18px] pr-3.5 shadow-[var(--shadow-soft)]">

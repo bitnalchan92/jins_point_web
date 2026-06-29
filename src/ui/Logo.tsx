@@ -1,4 +1,12 @@
-const SIZES = {
+type LogoSize = 'sm' | 'md' | 'lg' | 'xl'
+
+interface LogoProps {
+  size?: LogoSize
+  emoji?: string
+  className?: string
+}
+
+const SIZES: Record<LogoSize, string> = {
   sm: 'h-[38px] w-[38px] rounded-xl text-[19px]',
   md: 'h-[42px] w-[42px] rounded-[13px] text-[21px]',
   lg: 'h-16 w-16 rounded-[20px] text-[32px] shadow-[0_14px_28px_-12px_rgba(240,169,26,.7)]',
@@ -6,7 +14,7 @@ const SIZES = {
 }
 
 // 🍙 그라데이션 브랜드 로고
-export default function Logo({ size = 'md', emoji = '🍙', className = '' }) {
+export default function Logo({ size = 'md', emoji = '🍙', className = '' }: LogoProps) {
   return (
     <div
       className={`grid shrink-0 place-items-center bg-[linear-gradient(150deg,var(--color-brand),var(--color-brand-dark))] ${SIZES[size]} ${className}`}

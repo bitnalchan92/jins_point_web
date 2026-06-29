@@ -3,7 +3,11 @@ import { STORE_NAME, STORE_TAGLINE, demoChips } from '../lib/data'
 import { formatPhone, isValidPhone, onlyDigits } from '../lib/format'
 import Logo from '../ui/Logo'
 
-export default function CustomerLandingScreen({ onSubmit }) {
+interface CustomerLandingScreenProps {
+  onSubmit: (phone: string) => void
+}
+
+export default function CustomerLandingScreen({ onSubmit }: CustomerLandingScreenProps) {
   const [phone, setPhone] = useState('')
   const valid = isValidPhone(phone)
 

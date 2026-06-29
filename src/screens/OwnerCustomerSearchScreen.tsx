@@ -1,12 +1,19 @@
 import { useMemo, useState } from 'react'
 import { REWARD_THRESHOLD } from '../lib/data'
+import type { Customer } from '../lib/data'
 import { comma, formatPhone, onlyDigits } from '../lib/format'
 import { useStore } from '../store'
+
+interface CustomerCardProps {
+  customer: Customer
+  open: boolean
+  onToggle: () => void
+}
 
 export default function OwnerCustomerSearchScreen() {
   const { customers } = useStore()
   const [query, setQuery] = useState('')
-  const [expanded, setExpanded] = useState(null)
+  const [expanded, setExpanded] = useState<string | null>(null)
 
   const queryDigits = onlyDigits(query)
 
@@ -57,7 +64,7 @@ export default function OwnerCustomerSearchScreen() {
   )
 }
 
-function CustomerCard({ customer, open, onToggle }) {
+function CustomerCard({ customer, open, onToggle }: CustomerCardProps) {
   const within = customer.points % REWARD_THRESHOLD
   const remain = within === 0 ? 0 : REWARD_THRESHOLD - within
 

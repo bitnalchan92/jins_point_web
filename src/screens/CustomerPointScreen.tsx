@@ -1,9 +1,15 @@
 import { STORE_NAME } from '../lib/data'
+import type { Customer } from '../lib/data'
 import { comma, formatPhone } from '../lib/format'
 import { useStore } from '../store'
 import Logo from '../ui/Logo'
 
-export default function CustomerPointScreen({ phone, onChangePhone }) {
+interface CustomerPointScreenProps {
+  phone: string
+  onChangePhone: () => void
+}
+
+export default function CustomerPointScreen({ phone, onChangePhone }: CustomerPointScreenProps) {
   const { findCustomer } = useStore()
   const customer = findCustomer(phone)
 
@@ -72,7 +78,7 @@ function NewCustomer() {
   )
 }
 
-function ExistingCustomer({ customer }) {
+function ExistingCustomer({ customer }: { customer: Customer }) {
   const points = customer.points
 
   return (

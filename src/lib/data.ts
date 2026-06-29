@@ -10,11 +10,48 @@ export const STAMP_GOAL = 10 // 방문 도장 10개 → 김밥 1줄 무료
 
 export const OWNER_PIN = '1234'
 
-/** @typedef {{ type: 'earn' | 'use', label: string, amount: number, date: string }} HistoryEntry */
-/** @typedef {{ phone: string, name: string, points: number, visits: number, lastVisit: string, history: HistoryEntry[] }} Customer */
+export type HistoryType = 'earn' | 'use'
 
-/** @type {Customer[]} */
-export const customers = [
+export interface HistoryEntry {
+  type: HistoryType
+  label: string
+  amount: number
+  date: string
+}
+
+export interface Customer {
+  phone: string
+  name: string
+  points: number
+  visits: number
+  lastVisit: string
+  history: HistoryEntry[]
+}
+
+export interface DemoChip {
+  phone: string
+  tag: '단골' | '신규'
+}
+
+export interface DashboardKpi {
+  label: string
+  value: string
+  icon: string
+  tone: 'brand' | 'leaf'
+}
+
+export interface DashboardWeekEntry {
+  day: string
+  value: number
+  today?: boolean
+}
+
+export interface DashboardData {
+  kpis: DashboardKpi[]
+  week: DashboardWeekEntry[]
+}
+
+export const customers: Customer[] = [
   {
     phone: '01023457788',
     name: '김서연',
@@ -77,14 +114,14 @@ export const customers = [
 ]
 
 // 손님 랜딩 — 빠른 입력용 데모 칩
-export const demoChips = [
+export const demoChips: DemoChip[] = [
   { phone: '01023457788', tag: '단골' },
   { phone: '01098765432', tag: '단골' },
   { phone: '01000000000', tag: '신규' },
 ]
 
 // 대시보드 — KPI / 주간 매출
-export const dashboard = {
+export const dashboard: DashboardData = {
   kpis: [
     { label: '오늘 적립', value: '14건', icon: '☕', tone: 'brand' },
     { label: '신규 손님', value: '3명', icon: '🌱', tone: 'leaf' },

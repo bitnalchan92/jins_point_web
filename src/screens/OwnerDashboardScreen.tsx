@@ -3,7 +3,28 @@ import { REWARD_THRESHOLD, STORE_NAME, STORE_TAGLINE } from '../lib/data'
 import { comma } from '../lib/format'
 import { useStore } from '../store'
 
-export default function OwnerDashboardScreen({ onLogout }) {
+interface OwnerDashboardScreenProps {
+  onLogout: () => void
+}
+
+interface KpiCardProps {
+  icon: string
+  label: string
+  value: string
+  tone: 'brand' | 'leaf'
+}
+
+interface InfoRowProps {
+  label: string
+  value: string
+}
+
+interface RateRowProps {
+  rate: number
+  onSave: (rate: number) => void
+}
+
+export default function OwnerDashboardScreen({ onLogout }: OwnerDashboardScreenProps) {
   const { customers, rewardLog, rate, updateRate } = useStore()
 
   const todayEarn = rewardLog.filter((r) => r.type === 'earn').length
@@ -74,7 +95,7 @@ export default function OwnerDashboardScreen({ onLogout }) {
   )
 }
 
-function KpiCard({ icon, label, value, tone }) {
+function KpiCard({ icon, label, value, tone }: KpiCardProps) {
   return (
     <div className="rounded-[18px] border border-line bg-card px-[22px] py-5 shadow-[var(--shadow-soft)]">
       <div className="flex items-center gap-2.5">
@@ -93,7 +114,7 @@ function KpiCard({ icon, label, value, tone }) {
   )
 }
 
-function InfoRow({ label, value }) {
+function InfoRow({ label, value }: InfoRowProps) {
   return (
     <div className="flex items-center justify-between border-t border-line pt-3 text-sm first:border-t-0 first:pt-0">
       <span className="font-bold text-ink-soft">{label}</span>
@@ -102,7 +123,7 @@ function InfoRow({ label, value }) {
   )
 }
 
-function RateRow({ rate, onSave }) {
+function RateRow({ rate, onSave }: RateRowProps) {
   const [editing, setEditing] = useState(false)
   const [input, setInput] = useState('')
 
