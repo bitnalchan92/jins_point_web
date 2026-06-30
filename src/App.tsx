@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { STORE_NAME } from './lib/data'
 import type { BalanceResponse } from './lib/contracts'
-import { StoreProvider } from './store'
+import { OwnerStoreProvider } from './owner/OwnerStoreProvider'
 import { OwnerAuthProvider, useOwnerAuth } from './auth/OwnerAuthProvider'
 import OwnerLoginForm from './auth/OwnerLoginForm'
 import OwnerMfaForm from './auth/OwnerMfaForm'
@@ -78,14 +78,15 @@ function AdminGate() {
     )
   }
   if (state.status !== 'ready') return <AdminAuthErrorScreen />
-  // Owner screens still rely on the demo StoreProvider until Task 7 replaces it
-  // with the production owner provider. Mount it only for the ready owner app.
+  // Mount the production owner store only for the authenticated aal2 owner. It
+  // sources all data from the server bootstrap; on logout this subtree unmounts,
+  // which discards the provider's owner data.
   return (
-    <StoreProvider>
+    <OwnerStoreProvider>
       <div className="min-h-full pb-20">
         <OwnerApp />
       </div>
-    </StoreProvider>
+    </OwnerStoreProvider>
   )
 }
 

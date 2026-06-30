@@ -1,7 +1,9 @@
 import { useState } from 'react'
-import { REWARD_THRESHOLD, STORE_NAME, STORE_TAGLINE } from '../lib/data'
+import type { OwnerBootstrap } from '../lib/contracts'
 import { comma } from '../lib/format'
-import { useStore } from '../store'
+import { useOwnerStore } from '../owner/OwnerStoreProvider'
+import type { OwnerStoreValue } from '../owner/OwnerStoreProvider'
+import { OwnerLoading, OwnerRetry } from './ownerShared'
 
 interface OwnerDashboardScreenProps {
   onLogout: () => void
@@ -21,13 +23,31 @@ interface InfoRowProps {
 
 interface RateRowProps {
   rate: number
-  onSave: (rate: number) => void
+  onSave: (rate: number) => Promise<void>
 }
 
 export default function OwnerDashboardScreen({ onLogout }: OwnerDashboardScreenProps) {
-  const { customers, rewardLog, rate, updateRate } = useStore()
+  const { state, refresh, updateRate } = useOwnerStore()
+  if (state.status === 'loading') return <OwnerLoading />
+  if (state.status === 'error' || !state.data)
+    return <OwnerRetry onRetry={() => void refresh()} />
+  return (
+    <DashboardScreen data={state.data} updateRate={updateRate} onLogout={onLogout} />
+  )
+}
 
-  const todayEarn = rewardLog.filter((r) => r.type === 'earn').length
+function DashboardScreen({
+  data,
+  updateRate,
+  onLogout,
+}: {
+  data: OwnerBootstrap
+  updateRate: OwnerStoreValue['updateRate']
+  onLogout: () => void
+}) {
+  const { customers, recentRewards, store } = data
+
+  const todayEarn = recentRewards.filter((r) => r.type === 'earn').length
   const totalPoints = customers.reduce((sum, c) => sum + c.points, 0)
   const top = [...customers].sort((a, b) => b.points - a.points).slice(0, 3)
 
@@ -35,7 +55,7 @@ export default function OwnerDashboardScreen({ onLogout }: OwnerDashboardScreenP
     <div className="mt-[18px] animate-fade">
       {/* KPI 3개 */}
       <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3.5">
-        <KpiCard icon="☕" label="오늘 적립" value={`${todayEarn}건`} tone="brand" />
+        <KpiCard icon="☕" label="최근 적립" value={`${todayEarn}건`} tone="brand" />
         <KpiCard icon="👥" label="손님 수" value={`${customers.length}명`} tone="brand" />
         <KpiCard icon="⭐" label="총 사용가능 포인트" value={`${comma(totalPoints)}P`} tone="leaf" />
       </div>
@@ -45,10 +65,10 @@ export default function OwnerDashboardScreen({ onLogout }: OwnerDashboardScreenP
         <div className="flex-[2_1_340px] rounded-[20px] border border-line bg-card px-6 py-[22px] shadow-[var(--shadow-soft)]">
           <h3 className="mb-4 text-base font-extrabold">가게 정보</h3>
           <div className="flex flex-col gap-3">
-            <InfoRow label="가게명" value={STORE_NAME} />
-            <InfoRow label="업종" value={STORE_TAGLINE} />
-            <RateRow rate={rate} onSave={updateRate} />
-            <InfoRow label="무료 메뉴 기준" value={`${comma(REWARD_THRESHOLD)}P`} />
+            <InfoRow label="가게명" value={store.name} />
+            <InfoRow label="업종" value={store.tagline} />
+            <RateRow rate={store.rewardRate} onSave={updateRate} />
+            <InfoRow label="무료 메뉴 기준" value={`${comma(store.rewardThreshold)}P`} />
             <InfoRow label="누적 단골" value={`${customers.length}명`} />
           </div>
         </div>
@@ -60,7 +80,7 @@ export default function OwnerDashboardScreen({ onLogout }: OwnerDashboardScreenP
           ) : (
             <div className="flex flex-col gap-4">
               {top.map((c, i) => (
-                <div key={c.phone} className="flex items-center gap-3">
+                <div key={c.id} className="flex items-center gap-3">
                   <div
                     className={[
                       'grid h-[30px] w-[30px] flex-none place-items-center rounded-[9px] text-sm font-extrabold',
@@ -126,18 +146,29 @@ function InfoRow({ label, value }: InfoRowProps) {
 function RateRow({ rate, onSave }: RateRowProps) {
   const [editing, setEditing] = useState(false)
   const [input, setInput] = useState('')
+  const [saving, setSaving] = useState(false)
 
   const startEdit = () => {
     setInput(String((rate * 100).toFixed(1)))
     setEditing(true)
   }
 
-  const save = () => {
+  const save = async () => {
+    if (saving) return
     const pct = parseFloat(input)
     if (!isNaN(pct) && pct > 0 && pct <= 100) {
-      onSave(parseFloat((pct / 100).toFixed(4)))
+      setSaving(true)
+      try {
+        await onSave(parseFloat((pct / 100).toFixed(4)))
+        setEditing(false)
+      } catch {
+        // Leave the editor open so the owner can retry the save.
+      } finally {
+        setSaving(false)
+      }
+    } else {
+      setEditing(false)
     }
-    setEditing(false)
   }
 
   const cancel = () => setEditing(false)
@@ -172,7 +203,7 @@ function RateRow({ rate, onSave }: RateRowProps) {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') save()
+            if (e.key === 'Enter') void save()
             if (e.key === 'Escape') cancel()
           }}
           min="0.1"
@@ -184,11 +215,11 @@ function RateRow({ rate, onSave }: RateRowProps) {
         <span className="font-extrabold">%</span>
         <button
           type="button"
-          onClick={save}
-          disabled={!valid}
+          onClick={() => void save()}
+          disabled={!valid || saving}
           className="rounded-[8px] bg-brand px-2.5 py-1 text-[12px] font-extrabold text-ink transition disabled:opacity-40"
         >
-          저장
+          {saving ? '저장 중' : '저장'}
         </button>
         <button
           type="button"

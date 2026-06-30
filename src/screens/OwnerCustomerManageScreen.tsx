@@ -1,25 +1,43 @@
 import { useMemo, useRef, useState } from 'react'
-import { REWARD_THRESHOLD } from '../lib/data'
-import type { Customer } from '../lib/data'
-import { comma, formatPhone, onlyDigits } from '../lib/format'
-import { useStore } from '../store'
-import type { StoreContextValue } from '../store'
+import type { OwnerBootstrap, OwnerCustomer } from '../lib/contracts'
+import { comma, onlyDigits } from '../lib/format'
+import { displayKoreanPhone } from '../lib/phone'
+import { OwnerApiError } from '../owner/ownerApi'
+import { useOwnerStore } from '../owner/OwnerStoreProvider'
+import type { OwnerStoreValue } from '../owner/OwnerStoreProvider'
 import Toast from '../ui/Toast'
 import type { ToastConfig } from '../ui/Toast'
+import { OwnerLoading, OwnerRetry } from './ownerShared'
 
 interface AddCustomerFormProps {
   onDone: (name: string) => void
-  addCustomer: StoreContextValue['addCustomer']
+  addCustomer: OwnerStoreValue['addCustomer']
 }
 
 interface CustomerCardProps {
-  customer: Customer
+  customer: OwnerCustomer
+  rewardThreshold: number
   open: boolean
   onToggle: () => void
 }
 
 export default function OwnerCustomerManageScreen() {
-  const { customers, addCustomer } = useStore()
+  const { state, refresh, addCustomer } = useOwnerStore()
+  if (state.status === 'loading') return <OwnerLoading />
+  if (state.status === 'error' || !state.data) return <OwnerRetry onRetry={() => void refresh()} />
+  return <CustomerManageScreen data={state.data} addCustomer={addCustomer} />
+}
+
+function CustomerManageScreen({
+  data,
+  addCustomer,
+}: {
+  data: OwnerBootstrap
+  addCustomer: OwnerStoreValue['addCustomer']
+}) {
+  const customers = data.customers
+  const rewardThreshold = data.store.rewardThreshold
+
   const [query, setQuery] = useState('')
   const [expanded, setExpanded] = useState<string | null>(null)
   const [showAddForm, setShowAddForm] = useState(false)
@@ -37,7 +55,7 @@ export default function OwnerCustomerManageScreen() {
     const qDigits = onlyDigits(q)
     const filtered = customers.filter((c) => {
       if (q === '') return true
-      if (qDigits.length > 0 && c.phone.includes(qDigits)) return true
+      if (qDigits.length > 0 && c.phoneE164.includes(qDigits)) return true
       if (c.name.includes(q)) return true
       return false
     })
@@ -97,10 +115,11 @@ export default function OwnerCustomerManageScreen() {
         <div className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-3">
           {results.map((c) => (
             <CustomerCard
-              key={c.phone}
+              key={c.id}
               customer={c}
-              open={expanded === c.phone}
-              onToggle={() => setExpanded((e) => (e === c.phone ? null : c.phone))}
+              rewardThreshold={rewardThreshold}
+              open={expanded === c.id}
+              onToggle={() => setExpanded((e) => (e === c.id ? null : c.id))}
             />
           ))}
         </div>
@@ -115,6 +134,7 @@ function AddCustomerForm({ onDone, addCustomer }: AddCustomerFormProps) {
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [error, setError] = useState('')
+  const [pending, setPending] = useState(false)
   const nameRef = useRef<HTMLInputElement | null>(null)
 
   const formatPhoneInput = (val: string) => {
@@ -124,20 +144,28 @@ function AddCustomerForm({ onDone, addCustomer }: AddCustomerFormProps) {
     return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (pending) return
     const trimName = name.trim()
     const digits = onlyDigits(phone)
     if (!trimName) return setError('이름을 입력해주세요')
     if (digits.length < 10) return setError('올바른 전화번호를 입력해주세요')
 
-    const result = addCustomer(phone, trimName)
-    if (!result.success) {
-      if (result.error === 'duplicate') setError('이미 등록된 전화번호예요')
-      else setError('올바른 전화번호를 입력해주세요')
-      return
+    setError('')
+    setPending(true)
+    try {
+      await addCustomer(phone, trimName)
+      onDone(trimName)
+    } catch (e) {
+      const code = e instanceof OwnerApiError ? e.code : 'INTERNAL'
+      if (code === 'DUPLICATE_CUSTOMER') setError('이미 등록된 전화번호예요')
+      else if (code === 'INVALID_PHONE' || code === 'INVALID_REQUEST')
+        setError('올바른 전화번호를 입력해주세요')
+      else if (code === 'UNAUTHORIZED') setError('세션이 만료되었어요. 다시 로그인해 주세요')
+      else setError('등록하지 못했어요. 잠시 후 다시 시도해 주세요')
+    } finally {
+      setPending(false)
     }
-
-    onDone(trimName)
   }
 
   return (
@@ -150,7 +178,10 @@ function AddCustomerForm({ onDone, addCustomer }: AddCustomerFormProps) {
             ref={nameRef}
             type="text"
             value={name}
-            onChange={(e) => { setName(e.target.value); setError('') }}
+            onChange={(e) => {
+              setName(e.target.value)
+              setError('')
+            }}
             placeholder="홍길동"
             className="w-full rounded-[12px] border border-line bg-pale-soft px-4 py-3 text-[15px] font-bold outline-none focus:border-brand"
           />
@@ -161,7 +192,10 @@ function AddCustomerForm({ onDone, addCustomer }: AddCustomerFormProps) {
             type="tel"
             inputMode="numeric"
             value={phone}
-            onChange={(e) => { setPhone(formatPhoneInput(e.target.value)); setError('') }}
+            onChange={(e) => {
+              setPhone(formatPhoneInput(e.target.value))
+              setError('')
+            }}
             placeholder="010-0000-0000"
             className="w-full rounded-[12px] border border-line bg-pale-soft px-4 py-3 text-[15px] font-bold tabular-nums outline-none focus:border-brand"
           />
@@ -175,19 +209,23 @@ function AddCustomerForm({ onDone, addCustomer }: AddCustomerFormProps) {
 
         <button
           type="button"
-          onClick={handleSubmit}
-          className="mt-1 w-full rounded-[14px] bg-ink py-3.5 text-[14px] font-extrabold text-white transition hover:opacity-90"
+          onClick={() => void handleSubmit()}
+          disabled={pending}
+          className="mt-1 w-full rounded-[14px] bg-ink py-3.5 text-[14px] font-extrabold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          등록하기
+          {pending ? '등록 중…' : '등록하기'}
         </button>
       </div>
     </div>
   )
 }
 
-function CustomerCard({ customer, open, onToggle }: CustomerCardProps) {
-  const within = customer.points % REWARD_THRESHOLD
-  const remain = within === 0 && customer.points > 0 ? 0 : REWARD_THRESHOLD - within
+function CustomerCard({ customer, rewardThreshold, open, onToggle }: CustomerCardProps) {
+  const within = customer.points % rewardThreshold
+  const remain = within === 0 && customer.points > 0 ? 0 : rewardThreshold - within
+  const lastVisit = customer.lastVisitedAt
+    ? new Date(customer.lastVisitedAt).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })
+    : '방문 기록 없음'
 
   return (
     <div
@@ -205,7 +243,9 @@ function CustomerCard({ customer, open, onToggle }: CustomerCardProps) {
         </div>
         <div className="min-w-0 flex-1">
           <div className="text-[15.5px] font-extrabold">{customer.name}</div>
-          <div className="text-xs font-semibold text-ink-soft">{formatPhone(customer.phone)}</div>
+          <div className="text-xs font-semibold text-ink-soft">
+            {displayKoreanPhone(customer.phoneE164)}
+          </div>
         </div>
         <div className="text-right">
           <div className="text-lg font-extrabold tracking-tight tabular-nums text-brand-dark">
@@ -217,36 +257,16 @@ function CustomerCard({ customer, open, onToggle }: CustomerCardProps) {
 
       {open && (
         <div className="mt-3.5 border-t border-line pt-3.5">
-          <div className="mb-3 flex gap-2.5">
+          <div className="flex gap-2.5">
             <div className="flex-1 rounded-xl bg-pale-soft px-3 py-2.5">
               <div className="text-[11px] font-bold text-ink-soft">무료 메뉴까지</div>
               <div className="mt-0.5 text-[15px] font-extrabold tabular-nums">{comma(remain)}P</div>
             </div>
             <div className="flex-1 rounded-xl bg-pale-soft px-3 py-2.5">
               <div className="text-[11px] font-bold text-ink-soft">최근 방문</div>
-              <div className="mt-0.5 text-[15px] font-extrabold">{customer.lastVisit}</div>
+              <div className="mt-0.5 text-[15px] font-extrabold">{lastVisit}</div>
             </div>
           </div>
-
-          <div className="mb-1.5 text-[11.5px] font-extrabold text-ink-soft">최근 내역</div>
-          {customer.history.length === 0 ? (
-            <div className="py-2 text-[12px] text-ink-soft">내역이 없어요</div>
-          ) : (
-            customer.history.slice(0, 3).map((h, i) => (
-              <div key={i} className="flex items-center justify-between border-t border-line py-[9px] first:border-t-0">
-                <span className="text-[12.5px] font-semibold text-ink-soft">{h.date}</span>
-                <span
-                  className={[
-                    'text-[13px] font-extrabold tabular-nums',
-                    h.type === 'use' ? 'text-danger' : 'text-leaf',
-                  ].join(' ')}
-                >
-                  {h.type === 'use' ? '' : '+'}
-                  {comma(h.amount)}P
-                </span>
-              </div>
-            ))
-          )}
         </div>
       )}
     </div>

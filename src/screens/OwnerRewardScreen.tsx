@@ -1,10 +1,14 @@
 import { useRef, useState } from 'react'
-import type { Customer } from '../lib/data'
+import type { OwnerBootstrap, OwnerCustomer } from '../lib/contracts'
 import { comma, onlyDigits } from '../lib/format'
-import { useStore } from '../store'
+import { displayKoreanPhone } from '../lib/phone'
+import { OwnerApiError } from '../owner/ownerApi'
+import { useOwnerStore } from '../owner/OwnerStoreProvider'
+import type { OwnerStoreValue } from '../owner/OwnerStoreProvider'
 import Keypad, { numericKeys } from '../ui/Keypad'
 import Toast from '../ui/Toast'
 import type { ToastConfig } from '../ui/Toast'
+import { OwnerLoading, OwnerRetry } from './ownerShared'
 
 type RewardMode = 'earn' | 'use'
 type RewardStep = 'search' | 'select' | 'amount'
@@ -17,20 +21,21 @@ interface SearchStepProps {
 }
 
 interface SelectStepProps {
-  matches: Customer[]
-  onSelect: (customer: Customer) => void
+  matches: OwnerCustomer[]
+  onSelect: (customer: OwnerCustomer) => void
   onBack: () => void
   suffix: string
 }
 
 interface AmountStepProps {
   mode: RewardMode
-  resolved: Customer
+  resolved: OwnerCustomer
   amountNumber: number
   earn: number
   notEnough: boolean | null
   notUnitValid: boolean
   rate: number
+  redeemUnit: number
   onKey: (value: string) => void
   onEarnChip: (delta: number) => void
   onUseChip: (delta: number) => void
@@ -40,7 +45,7 @@ interface AmountStepProps {
 interface PreviewCardProps {
   mode: RewardMode
   step: RewardStep
-  resolved: Customer | null
+  resolved: OwnerCustomer | null
   amountNumber: number
   earn: number
   notEnough: boolean | null
@@ -60,30 +65,70 @@ const USE_CHIPS = [
   { label: '전체삭제', delta: 0 },
 ]
 
-// 단계: 'search' → 손님 4자리 입력, 'select' → 복수 매칭 선택, 'amount' → 금액 입력
+function errorToast(code: OwnerApiError['code']): ToastConfig {
+  switch (code) {
+    case 'IDEMPOTENCY_CONFLICT':
+      return { icon: '⚠️', title: '이미 처리된 요청이에요', sub: '잠시 후 다시 시도해 주세요' }
+    case 'UNPROCESSABLE':
+      return {
+        icon: '⚠️',
+        title: '처리할 수 없는 요청이에요',
+        sub: '포인트 잔액과 사용 단위를 확인해 주세요',
+      }
+    case 'UNAUTHORIZED':
+      return { icon: '🔒', title: '세션이 만료되었어요', sub: '다시 로그인해 주세요' }
+    default:
+      return { icon: '⚠️', title: '처리하지 못했어요', sub: '잠시 후 다시 시도해 주세요' }
+  }
+}
+
+function rewardTime(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
 export default function OwnerRewardScreen() {
-  const { customers, rewardLog, addReward, redeemPoints, rate } = useStore()
-  const [mode, setMode] = useState<RewardMode>('earn') // 'earn' | 'use'
-  const [step, setStep] = useState<RewardStep>('search') // 'search' | 'select' | 'amount'
+  const { state, refresh, applyReward } = useOwnerStore()
+  if (state.status === 'loading') return <OwnerLoading />
+  if (state.status === 'error' || !state.data) return <OwnerRetry onRetry={() => void refresh()} />
+  return <RewardScreen data={state.data} applyReward={applyReward} />
+}
+
+// 단계: 'search' → 손님 4자리 입력, 'select' → 복수 매칭 선택, 'amount' → 금액 입력
+function RewardScreen({
+  data,
+  applyReward,
+}: {
+  data: OwnerBootstrap
+  applyReward: OwnerStoreValue['applyReward']
+}) {
+  const customers = data.customers
+  const rate = data.store.rewardRate
+  const redeemUnit = data.store.redeemUnit
+  const recentRewards = data.recentRewards
+
+  const [mode, setMode] = useState<RewardMode>('earn')
+  const [step, setStep] = useState<RewardStep>('search')
   const [suffix, setSuffix] = useState('')
-  const [matches, setMatches] = useState<Customer[]>([])
-  const [resolved, setResolved] = useState<Customer | null>(null) // 선택된 손님
+  const [matches, setMatches] = useState<OwnerCustomer[]>([])
+  const [resolved, setResolved] = useState<OwnerCustomer | null>(null)
   const [amount, setAmount] = useState('')
+  const [submitting, setSubmitting] = useState(false)
   const [toast, setToast] = useState<ToastConfig | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const amountNumber = Number(amount) || 0
   const earn = Math.floor(amountNumber * rate)
   const notEnough = mode === 'use' && resolved && amountNumber > 0 && amountNumber > resolved.points
-  const notUnitValid = mode === 'use' && amountNumber > 0 && amountNumber % 1000 !== 0
+  const notUnitValid = mode === 'use' && amountNumber > 0 && amountNumber % redeemUnit !== 0
   const canSubmit =
     step === 'amount' &&
-    resolved &&
+    !!resolved &&
     amountNumber > 0 &&
     !notUnitValid &&
     (mode === 'earn' || !notEnough)
 
-  // 4자리 키패드 입력
   const onSuffixKey = (value: string) => {
     setSuffix((s) => {
       if (value === 'back') return s.slice(0, -1)
@@ -92,11 +137,11 @@ export default function OwnerRewardScreen() {
     })
   }
 
-  // 4자리 검색 실행
+  // 휴대폰 뒷자리 4자리로 검색 (E.164 끝자리 비교)
   const searchBySuffix = () => {
     const clean = onlyDigits(suffix)
     if (clean.length !== 4) return
-    const found = customers.filter((c) => c.phone.endsWith(clean))
+    const found = customers.filter((c) => c.phoneE164.endsWith(clean))
     setMatches(found)
     if (found.length === 1) {
       setResolved(found[0]!)
@@ -106,7 +151,7 @@ export default function OwnerRewardScreen() {
     }
   }
 
-  const selectCustomer = (customer: Customer) => {
+  const selectCustomer = (customer: OwnerCustomer) => {
     setResolved(customer)
     setStep('amount')
   }
@@ -148,26 +193,34 @@ export default function OwnerRewardScreen() {
     resetAll()
   }
 
-  const submit = () => {
-    if (!resolved) return
-    if (mode === 'earn') {
-      const result = addReward(resolved.phone, amountNumber)
-      if (!result) return
-      showToast({
-        icon: '🍙',
-        title: `${result.name} · +${comma(result.earn)}P 적립 완료`,
-        sub: '포인트가 적립되었어요',
-      })
-    } else {
-      const result = redeemPoints(resolved.phone, amountNumber)
-      if (!result) return
-      showToast({
-        icon: '🎁',
-        title: `${result.name} · -${comma(result.use)}P 사용 완료`,
-        sub: `잔여 포인트 ${comma(result.remaining)}P`,
-      })
+  // 서버가 확정한 pointsDelta/balanceAfter만 표시한다. 클라이언트 계산값(earn)은
+  // 입력 중 미리보기 문구에만 쓰고, 결과 토스트에는 절대 사용하지 않는다.
+  const submit = async () => {
+    if (!resolved || submitting) return
+    setSubmitting(true)
+    const idempotencyKey = crypto.randomUUID()
+    try {
+      const result = await applyReward(resolved.id, mode, amountNumber, idempotencyKey)
+      if (mode === 'earn') {
+        showToast({
+          icon: '🍙',
+          title: `${resolved.name} · +${comma(result.pointsDelta)}P 적립 완료`,
+          sub: `잔여 포인트 ${comma(result.balanceAfter)}P`,
+        })
+      } else {
+        showToast({
+          icon: '🎁',
+          title: `${resolved.name} · ${comma(result.pointsDelta)}P 사용 완료`,
+          sub: `잔여 포인트 ${comma(result.balanceAfter)}P`,
+        })
+      }
+      resetAll()
+    } catch (error) {
+      const code = error instanceof OwnerApiError ? error.code : 'INTERNAL'
+      showToast(errorToast(code))
+    } finally {
+      setSubmitting(false)
     }
-    resetAll()
   }
 
   return (
@@ -200,32 +253,23 @@ export default function OwnerRewardScreen() {
         {/* 입력 패널 */}
         <div className="flex-[1_1_360px] rounded-[22px] border border-line bg-card p-6 shadow-[var(--shadow-card)]">
           {step === 'search' && (
-            <SearchStep
-              suffix={suffix}
-              onKey={onSuffixKey}
-              onSearch={searchBySuffix}
-              mode={mode}
-            />
+            <SearchStep suffix={suffix} onKey={onSuffixKey} onSearch={searchBySuffix} mode={mode} />
           )}
 
           {step === 'select' && (
-            <SelectStep
-              matches={matches}
-              onSelect={selectCustomer}
-              onBack={resetAll}
-              suffix={suffix}
-            />
+            <SelectStep matches={matches} onSelect={selectCustomer} onBack={resetAll} suffix={suffix} />
           )}
 
-          {step === 'amount' && (
+          {step === 'amount' && resolved && (
             <AmountStep
               mode={mode}
-              resolved={resolved!}
+              resolved={resolved}
               amountNumber={amountNumber}
               earn={earn}
               notEnough={notEnough}
               notUnitValid={notUnitValid}
               rate={rate}
+              redeemUnit={redeemUnit}
               onKey={onAmountKey}
               onEarnChip={onEarnChip}
               onUseChip={onUseChip}
@@ -250,42 +294,43 @@ export default function OwnerRewardScreen() {
           {step === 'amount' && (
             <button
               type="button"
-              onClick={submit}
-              disabled={!canSubmit}
+              onClick={() => void submit()}
+              disabled={!canSubmit || submitting}
               className={[
                 'w-full rounded-2xl py-[17px] text-base font-extrabold transition',
-                canSubmit
+                canSubmit && !submitting
                   ? mode === 'use'
                     ? 'bg-danger text-white shadow-[0_12px_24px_-12px_rgba(216,85,58,.45)]'
                     : 'bg-ink text-white shadow-[0_12px_24px_-12px_rgba(36,27,18,.5)]'
                   : 'cursor-not-allowed bg-[#e7dcc8] text-[#b4a48e]',
               ].join(' ')}
             >
-              {mode === 'earn' ? '포인트 적립하기' : '포인트 사용하기'}
+              {submitting ? '처리 중…' : mode === 'earn' ? '포인트 적립하기' : '포인트 사용하기'}
             </button>
           )}
 
           <div className="rounded-[18px] border border-line bg-card px-[18px] py-4">
             <div className="mb-1.5 text-[12.5px] font-extrabold text-ink-soft">최근 내역</div>
-            {rewardLog.length === 0 && (
+            {recentRewards.length === 0 && (
               <div className="py-2 text-center text-[12px] text-ink-soft">아직 내역이 없어요</div>
             )}
-            {rewardLog.map((r) => (
+            {recentRewards.slice(0, 8).map((r) => (
               <div
                 key={r.id}
                 className="flex items-center justify-between border-t border-line py-[9px] first:border-t-0"
               >
                 <div>
-                  <div className="text-[13.5px] font-bold">{r.name}</div>
-                  <div className="text-[11px] font-semibold text-ink-soft">
-                    {r.phone} · {r.time}
-                  </div>
+                  <div className="text-[13.5px] font-bold">{r.customerName}</div>
+                  <div className="text-[11px] font-semibold text-ink-soft">{rewardTime(r.createdAt)}</div>
                 </div>
                 <div
-                  className={['text-sm font-extrabold', r.type === 'use' ? 'text-danger' : 'text-leaf'].join(' ')}
+                  className={[
+                    'text-sm font-extrabold',
+                    r.type === 'use' ? 'text-danger' : 'text-leaf',
+                  ].join(' ')}
                 >
-                  {r.type === 'use' ? '-' : '+'}
-                  {comma(r.earn)}P
+                  {r.pointsDelta > 0 ? '+' : ''}
+                  {comma(r.pointsDelta)}P
                 </div>
               </div>
             ))}
@@ -379,7 +424,7 @@ function SelectStep({ matches, onSelect, onBack, suffix }: SelectStepProps) {
           </div>
           {matches.map((c) => (
             <button
-              key={c.phone}
+              key={c.id}
               type="button"
               onClick={() => onSelect(c)}
               className="flex w-full items-center justify-between rounded-[16px] border border-line bg-pale-soft px-5 py-4 text-left transition hover:border-brand hover:bg-pale"
@@ -387,7 +432,7 @@ function SelectStep({ matches, onSelect, onBack, suffix }: SelectStepProps) {
               <div>
                 <div className="text-[16px] font-extrabold">{c.name}</div>
                 <div className="mt-0.5 text-[12px] font-semibold text-ink-soft">
-                  {c.phone.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3')}
+                  {displayKoreanPhone(c.phoneE164)}
                 </div>
               </div>
               <div className="text-right">
@@ -411,6 +456,7 @@ function AmountStep({
   notEnough,
   notUnitValid,
   rate,
+  redeemUnit,
   onKey,
   onEarnChip,
   onUseChip,
@@ -418,7 +464,6 @@ function AmountStep({
 }: AmountStepProps) {
   return (
     <>
-      {/* 헤더: 손님 이름 + 보유 포인트 */}
       <div className="mb-4 flex items-center gap-2">
         <button
           type="button"
@@ -430,7 +475,6 @@ function AmountStep({
         <span className="text-[18px] font-extrabold">{resolved.name}</span>
       </div>
 
-      {/* 보유 포인트 배너 (use 모드에서 강조) */}
       {mode === 'use' ? (
         <div className="mb-4 flex items-center justify-between rounded-[14px] bg-[linear-gradient(135deg,var(--color-brand),var(--color-brand-dark))] px-5 py-3.5">
           <span className="text-[13px] font-extrabold text-ink/70">보유 포인트</span>
@@ -439,9 +483,7 @@ function AmountStep({
           </span>
         </div>
       ) : (
-        <div className="mb-3 text-[12px] font-semibold text-ink-soft">
-          보유 {comma(resolved.points)}P
-        </div>
+        <div className="mb-3 text-[12px] font-semibold text-ink-soft">보유 {comma(resolved.points)}P</div>
       )}
 
       <div className="block text-[12.5px] font-extrabold text-ink-soft">
@@ -476,17 +518,17 @@ function AmountStep({
 
       {mode === 'earn' && amountNumber > 0 && (
         <div className="mt-3 rounded-[12px] bg-pale px-4 py-2.5 text-[13px] font-extrabold text-brand-dark">
-          적립 예정: +{comma(earn)}P ({(rate * 100).toFixed(1)}% 적용)
+          적립 예정: +{comma(earn)}P ({(rate * 100).toFixed(1)}% 적용) · 최종 적립은 서버 확정
         </div>
       )}
       {mode === 'use' && !notEnough && !notUnitValid && (
         <div className="mt-3 rounded-[12px] bg-pale px-4 py-2.5 text-[12.5px] font-bold text-ink-soft">
-          1,000P 단위로만 사용 가능해요
+          {comma(redeemUnit)}P 단위로만 사용 가능해요
         </div>
       )}
       {notUnitValid && (
         <div className="mt-3 rounded-[12px] bg-[#fdeae5] px-4 py-2.5 text-[13px] font-extrabold text-danger">
-          ⚠️ 1,000P 단위로 입력해주세요
+          ⚠️ {comma(redeemUnit)}P 단위로 입력해주세요
         </div>
       )}
       {notEnough && (
@@ -559,7 +601,7 @@ function PreviewCard({
           </>
         ) : notUnitValid ? (
           <>
-            <div className="text-[12.5px] font-extrabold opacity-85">⚠️ 1,000P 단위로 입력해주세요</div>
+            <div className="text-[12.5px] font-extrabold opacity-85">⚠️ 단위를 확인해주세요</div>
             <div className="mt-0.5 text-sm font-bold opacity-70">현재 {comma(amountNumber)}P 입력됨</div>
           </>
         ) : amountNumber > 0 ? (
