@@ -8,8 +8,6 @@ export const POINT_RATE = 0.05 // 결제금액의 5% 적립
 export const REWARD_THRESHOLD = 5000 // 5,000P → 메뉴 1개 무료
 export const STAMP_GOAL = 10 // 방문 도장 10개 → 김밥 1줄 무료
 
-export const OWNER_PIN = '1234'
-
 export type HistoryType = 'earn' | 'use'
 
 export interface HistoryEntry {
