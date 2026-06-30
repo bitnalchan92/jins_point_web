@@ -7,6 +7,7 @@ import {
   updateRate as apiUpdateRate,
 } from './ownerApi'
 import type { OwnerBootstrap, RewardResult } from '../lib/contracts'
+import { useOwnerRealtime } from './useOwnerRealtime'
 
 export interface OwnerStoreState {
   status: 'loading' | 'ready' | 'error'
@@ -50,6 +51,13 @@ export function OwnerStoreProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     void refresh()
   }, [refresh])
+
+  // Subscribe to owner-only private Realtime only once authenticated as the aal2
+  // owner (status 'ready'). A broadcast is a signal, never data — it debounces
+  // into the authoritative refetch above. The provider is mounted exclusively
+  // under the authenticated /admin subtree, so the customer route opens no
+  // socket; the `ready` gate additionally avoids a subscribe before/without auth.
+  useOwnerRealtime(state.status === 'ready', refresh)
 
   const addCustomer = useCallback(
     async (phone: string, name: string) => {
