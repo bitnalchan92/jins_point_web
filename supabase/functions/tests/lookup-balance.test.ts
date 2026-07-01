@@ -160,7 +160,7 @@ function makeDeps(overrides: Partial<LookupDeps> = {}): Spy {
     },
     queryBalance: async () => {
       calls.query++
-      return { customer: { points: 3420 }, config: STORE_CONFIG }
+      return { customer: { id: 'cust-00000000-0000-4000-8000-000000000001', name: '홍길동', points: 3420 }, config: STORE_CONFIG, history: [] }
     },
     ...overrides,
   }
@@ -176,7 +176,7 @@ function withHmacSecret(): () => void {
   }
 }
 
-const NO_PII_KEYS = ['name', 'phone', 'customerId', 'history', 'visitCount']
+const NO_PII_KEYS = ['name', 'phone', 'customerId', 'visitCount']
 
 Deno.test('registered customer returns the minimal balance DTO with no PII', async () => {
   const restore = withHmacSecret()
@@ -191,6 +191,8 @@ Deno.test('registered customer returns the minimal balance DTO with no PII', asy
       rewardThreshold: 5000,
       pointsToNextReward: 5000 - (3420 % 5000),
       storeName: '달콤한 진스쿡',
+      maskedName: '홍*동',
+      history: [],
       asOf: body.asOf,
     })
     for (const key of NO_PII_KEYS) assertFalse(key in body)
@@ -204,7 +206,7 @@ Deno.test('unregistered customer returns the same response shape as a registered
   try {
     const registered = makeDeps()
     const unregistered = makeDeps({
-      queryBalance: async () => ({ customer: null, config: STORE_CONFIG }),
+      queryBalance: async () => ({ customer: null, config: STORE_CONFIG, history: [] }),
     })
     const regBody = await (await handleLookup(
       postRequest({ phone: '010-2345-7788', turnstileToken: 't' }),
@@ -339,17 +341,17 @@ const ANON_KEY = 'sb_publishable_unit_test_key'
 
 function withSecretClientEnv(secret: string | undefined): () => void {
   const prevUrl = Deno.env.get('SUPABASE_URL')
-  const prevSecret = Deno.env.get('SUPABASE_SECRET_KEY')
+  const prevSecret = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
   const prevHmac = Deno.env.get('PHONE_RATE_LIMIT_HMAC_SECRET')
   Deno.env.set('SUPABASE_URL', 'http://127.0.0.1:54321')
-  if (secret === undefined) Deno.env.delete('SUPABASE_SECRET_KEY')
-  else Deno.env.set('SUPABASE_SECRET_KEY', secret)
+  if (secret === undefined) Deno.env.delete('SUPABASE_SERVICE_ROLE_KEY')
+  else Deno.env.set('SUPABASE_SERVICE_ROLE_KEY', secret)
   Deno.env.set('PHONE_RATE_LIMIT_HMAC_SECRET', 'unit-test-hmac-secret')
   return () => {
     if (prevUrl === undefined) Deno.env.delete('SUPABASE_URL')
     else Deno.env.set('SUPABASE_URL', prevUrl)
-    if (prevSecret === undefined) Deno.env.delete('SUPABASE_SECRET_KEY')
-    else Deno.env.set('SUPABASE_SECRET_KEY', prevSecret)
+    if (prevSecret === undefined) Deno.env.delete('SUPABASE_SERVICE_ROLE_KEY')
+    else Deno.env.set('SUPABASE_SERVICE_ROLE_KEY', prevSecret)
     if (prevHmac === undefined) Deno.env.delete('PHONE_RATE_LIMIT_HMAC_SECRET')
     else Deno.env.set('PHONE_RATE_LIMIT_HMAC_SECRET', prevHmac)
   }
@@ -373,7 +375,9 @@ Deno.test('the real query path uses only the secret-scoped client (no anon table
       restEndpoints.push(path)
       const body = path.includes('store_config')
         ? JSON.stringify(STORE_CONFIG)
-        : JSON.stringify({ points: 3420 })
+        : path.includes('reward_log')
+        ? JSON.stringify([])
+        : JSON.stringify({ id: 'cust-00000000-0000-4000-8000-000000000001', name: '홍길동', points: 3420 })
       return Promise.resolve(
         new Response(body, {
           status: 200,
@@ -395,6 +399,7 @@ Deno.test('the real query path uses only the secret-scoped client (no anon table
     // Both intended tables were queried via the REST endpoint.
     assert(restEndpoints.some((p) => p.includes('/rest/v1/customers')), 'customers queried')
     assert(restEndpoints.some((p) => p.includes('/rest/v1/store_config')), 'store_config queried')
+    assert(restEndpoints.some((p) => p.includes('/rest/v1/reward_log')), 'reward_log queried')
     // Every authenticated key seen was the secret key; the anon key was never used.
     assert(usedKeys.has(SECRET_KEY), 'secret key used')
     assertFalse(usedKeys.has(ANON_KEY), 'anon key never used')

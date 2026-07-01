@@ -102,7 +102,8 @@ export default function CustomerLandingScreen({ onSuccess }: CustomerLandingScre
           className="mt-2.5 w-full rounded-[14px] border-[1.5px] border-line bg-pale-soft px-4 py-[15px] text-center text-[21px] font-bold tracking-wide tabular-nums text-ink outline-none transition-colors focus:border-brand disabled:opacity-60"
         />
 
-        <div className="mt-3.5 flex justify-center">
+        <div className="mt-3.5 flex flex-col items-center gap-2 rounded-[14px] border border-line bg-pale-soft py-3">
+          <span className="text-[11px] font-bold text-ink-soft">보안 확인</span>
           <TurnstileWidget
             key={widgetKey}
             onToken={setToken}

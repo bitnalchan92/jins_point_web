@@ -1,7 +1,8 @@
 # ADR-0001: 기술 스택 — Vite + React + Tailwind v4
 
-- **Status**: Accepted
+- **Status**: Accepted (amended)
 - **Date**: 2026-06-27
+- **Amended**: 2026-06-29 — TypeScript strict와 Supabase 보안 아키텍처 도입으로 일부 결정 변경 ([ADR-0011](./0011-typescript-strict.md), [ADR-0012](./0012-supabase-backend.md), [ADR-0014](./0014-production-auth-and-authorization.md) 참고)
 
 ## Context
 
@@ -26,8 +27,9 @@
 - **빌드/번들러**: Vite 8
 - **프레임워크**: React 19
 - **스타일**: Tailwind CSS v4 (`@tailwindcss/vite` 플러그인)
-- **타입스크립트**: 도입하지 않음 (프로토타입 단계, 코드 규모가 작음)
-- **상태 관리**: React `useState`만 사용 (전역 상태 라이브러리 도입 X)
+- **타입스크립트**: ~~도입하지 않음~~ → `strict: true` + `noUncheckedIndexedAccess` 도입 ([ADR-0011](./0011-typescript-strict.md))
+- **상태 관리**: React Context와 route별 provider/hook 사용 (별도 전역 상태 라이브러리 도입 X)
+- **백엔드·인증**: Stage 2부터 Supabase PostgreSQL/Auth/RLS/Edge Functions/Realtime 사용
 
 ## Consequences
 
@@ -39,6 +41,6 @@
 
 나쁜 점 / 따라오는 후속 결정:
 
-- 서버 사이드 기능이 필요해지면 별도 백엔드를 결정해야 한다 (ADR 후보)
-- 타입스크립트가 없어 입력 데이터(전화번호, 금액) 검증을 런타임에서 더 신경 써야 한다
-- 화면이 늘어남에 따라 라우팅 전략은 [ADR-0006](./0006-demo-mode-switcher.md)에서 임시로 데모 토글로 결정. 정식 라우터 도입은 후속 결정 대상 ([[adr-routing]] 후보)
+- Supabase Auth/RLS/Realtime에 대한 플랫폼 의존성이 생긴다.
+- TypeScript 타입과 별개로 전화번호·금액·외부 payload의 런타임 검증이 필요하다.
+- SPA에서는 인증 토큰을 다루므로 CSP, dependency 관리, XSS 방어가 중요하다.

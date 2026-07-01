@@ -36,6 +36,8 @@ const dto: BalanceResponse = {
   rewardThreshold: 5000,
   pointsToNextReward: 1580,
   storeName: '달콤한 진스쿡',
+  maskedName: null,
+  history: [],
   asOf: '2026-06-29T05:30:00.000Z',
 }
 

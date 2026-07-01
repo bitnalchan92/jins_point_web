@@ -1,6 +1,6 @@
 # ADR-0006: 화면 전환 — 데모용 모드 스위처 (라우터 미도입)
 
-- **Status**: Accepted
+- **Status**: Superseded by [ADR-0010](./0010-react-router.md)
 - **Date**: 2026-06-27
 
 ## Context
@@ -19,9 +19,11 @@
 
 - React Router 등 라우팅 라이브러리는 **이번 단계에서는 도입하지 않는다**.
 - 페이지 최상단에 작은 **데모 모드 스위처**를 둔다 (라벨: "데모 화면", 토글: 사장님 / 손님).
-- 모드는 `App.jsx`의 `useState`로만 관리한다. URL/쿼리스트링에 노출하지 않는다.
-- 화면 코드는 `src/screens/`에 모드별로 분리한다 (`OwnerRewardScreen.jsx`, `CustomerPointScreen.jsx`).
+- 모드는 `App.tsx`의 `useState`로만 관리한다. URL/쿼리스트링에 노출하지 않는다.
+- 화면 코드는 `src/screens/`에 모드별로 분리한다 (`OwnerRewardScreen.tsx`, `CustomerPointScreen.tsx`).
 - 공유 유틸은 `src/lib/`로 분리한다 (전화번호 포맷, 상수 등).
+
+> **이 결정은 이후 [ADR-0010](./0010-react-router.md)에서 React Router 도입으로 대체됐습니다.**
 
 ## Consequences
 

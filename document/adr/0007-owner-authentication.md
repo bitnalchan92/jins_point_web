@@ -1,6 +1,6 @@
 # ADR-0007: 사장님 인증 — 4자리 PIN + 디바이스 신뢰 모델
 
-- **Status**: Accepted
+- **Status**: Superseded by [ADR-0014](./0014-production-auth-and-authorization.md)
 - **Date**: 2026-06-27
 
 ## Context
@@ -27,6 +27,10 @@
 - 데모 단계의 PIN은 `1234`로 고정한다. 실제 MVP에서는 가게 설정에서 변경 가능하게 한다.
 - 사장님 메인은 로그인 후 진입하며, 하단 탭바로 [적립 / 손님 조회 / 대시보드]를 전환한다.
 - 로그아웃은 **대시보드 화면**에 둔다 (자주 누르는 곳이 아니라 의도적인 동선).
+
+> 이 결정은 Stage 1 프로토타입에만 적용한다. 프로덕션 인증은
+> [ADR-0014](./0014-production-auth-and-authorization.md)의 이메일·강한 비밀번호 +
+> 필수 TOTP MFA 방식으로 대체했다.
 
 ## Consequences
 

@@ -9,7 +9,7 @@ export function corsHeaders(request: Request): Record<string, string> {
 
   return {
     'access-control-allow-origin': origin,
-    'access-control-allow-headers': 'authorization, content-type, x-client-info',
+    'access-control-allow-headers': 'authorization, content-type, x-client-info, apikey',
     'access-control-allow-methods': 'GET, POST, PATCH, OPTIONS',
     vary: 'Origin',
   }

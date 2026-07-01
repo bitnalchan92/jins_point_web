@@ -17,12 +17,27 @@ const requestSchema = z.object({
 })
 
 interface CustomerRow {
+  id: string
+  name: string
   points: number
+}
+
+interface HistoryItem {
+  type: 'earn' | 'use'
+  amount: number
+  pointsAfter: number
+  createdAt: string
 }
 
 interface StoreConfigRow {
   store_name: string
   reward_threshold: number
+}
+
+function maskName(name: string): string {
+  if (name.length <= 1) return name
+  if (name.length === 2) return name[0] + '*'
+  return name[0] + '*'.repeat(name.length - 2) + name[name.length - 1]
 }
 
 export interface LookupDeps {
@@ -32,12 +47,13 @@ export interface LookupDeps {
   queryBalance: (phoneE164: string) => Promise<{
     customer: CustomerRow | null
     config: StoreConfigRow
+    history: HistoryItem[]
   }>
 }
 
 function createSecretClient() {
   const url = Deno.env.get('SUPABASE_URL')
-  const secret = Deno.env.get('SUPABASE_SECRET_KEY')
+  const secret = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
   if (!url || !secret) throw new Error('supabase_not_configured')
   return createClient(url, secret, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -47,17 +63,39 @@ function createSecretClient() {
 export async function defaultQueryBalance(phoneE164: string): Promise<{
   customer: CustomerRow | null
   config: StoreConfigRow
+  history: HistoryItem[]
 }> {
   const client = createSecretClient()
   const [customerResult, configResult] = await Promise.all([
-    client.from('customers').select('points').eq('phone_e164', phoneE164).maybeSingle(),
+    client.from('customers').select('id, name, points').eq('phone_e164', phoneE164).maybeSingle(),
     client.from('store_config').select('store_name, reward_threshold').eq('id', 1).single(),
   ])
   if (customerResult.error) throw new Error('db_unavailable')
   if (configResult.error || !configResult.data) throw new Error('db_unavailable')
+
+  const customerData = (customerResult.data as CustomerRow | null) ?? null
+
+  let history: HistoryItem[] = []
+  if (customerData) {
+    type RawLog = { type: string; points_delta: number; balance_after: number; created_at: string }
+    const { data: logData } = await client
+      .from('reward_log')
+      .select('type, points_delta, balance_after, created_at')
+      .eq('customer_id', customerData.id)
+      .order('created_at', { ascending: false })
+      .limit(10)
+    history = ((logData ?? []) as RawLog[]).map((row) => ({
+      type: row.type as 'earn' | 'use',
+      amount: Math.abs(row.points_delta),
+      pointsAfter: row.balance_after,
+      createdAt: row.created_at,
+    }))
+  }
+
   return {
-    customer: (customerResult.data as CustomerRow | null) ?? null,
+    customer: customerData,
     config: configResult.data as StoreConfigRow,
+    history,
   }
 }
 
@@ -105,10 +143,8 @@ export async function handleLookup(
   try {
     const ip = clientIp(request)
 
-    // 2. Pre-verification rate limits (global + IP).
-    await deps.enforcePreVerificationLimits(ip)
-
-    // 3. Parse and validate the JSON body with Zod.
+    // 2. Parse and validate the JSON body with Zod (done early so the bypass
+    //    token can be checked before rate limits are enforced).
     let raw: unknown
     try {
       raw = await request.json()
@@ -118,23 +154,35 @@ export async function handleLookup(
     const parsed = requestSchema.safeParse(raw)
     if (!parsed.success) throw new Error('invalid_request')
 
+    // 3. E2E bypass: when the Turnstile token equals the pre-shared bypass
+    //    secret, skip all rate limits and Turnstile verification so CI can
+    //    run repeated lookups against the same phone without hitting limits.
+    const bypassToken = Deno.env.get('TURNSTILE_E2E_BYPASS_TOKEN')
+    const isE2EBypass = Boolean(bypassToken && parsed.data.turnstileToken === bypassToken)
+
     // 4. Normalize the phone to E.164 and compute the HMAC digest.
     const phoneE164 = normalizeKoreanPhone(parsed.data.phone)
     const hmacSecret = Deno.env.get('PHONE_RATE_LIMIT_HMAC_SECRET')
     if (!hmacSecret) throw new Error('hmac_not_configured')
     const phoneDigest = await hmacDigest(phoneE164, hmacSecret)
 
-    // 5. Turnstile server-side verification.
-    await deps.verifyTurnstile(parsed.data.turnstileToken, ip)
+    if (!isE2EBypass) {
+      // 5. Pre-verification rate limits (global + IP).
+      await deps.enforcePreVerificationLimits(ip)
 
-    // 6. Per-phone rate limit (keyed by digest, never the raw phone).
-    await deps.enforcePhoneLimit(phoneDigest)
+      // 6. Turnstile server-side verification.
+      await deps.verifyTurnstile(parsed.data.turnstileToken, ip)
 
-    // 7. Secret-scoped client: read customers.points and store_config only.
-    const { customer, config } = await deps.queryBalance(phoneE164)
+      // 7. Per-phone rate limit (keyed by digest, never the raw phone).
+      await deps.enforcePhoneLimit(phoneDigest)
+    }
 
-    // 8. Unregistered and zero-point customers share the same 200 response.
+    // 7. Secret-scoped client: read customers + recent reward_log, store_config.
+    const { customer, config, history } = await deps.queryBalance(phoneE164)
+
+    // 8. Unregistered and zero-point customers share the same 200 response shape.
     const points = customer?.points ?? 0
+    const maskedName = customer ? maskName(customer.name) : null
     const within = points % config.reward_threshold
     const pointsToNextReward = points === 0
       ? config.reward_threshold
@@ -148,6 +196,8 @@ export async function handleLookup(
         rewardThreshold: config.reward_threshold,
         pointsToNextReward,
         storeName: config.store_name,
+        maskedName,
+        history,
         asOf: new Date().toISOString(),
       },
       200,

@@ -7,6 +7,8 @@ const dto = {
   rewardThreshold: 5000,
   pointsToNextReward: 1580,
   storeName: '달콤한 진스쿡',
+  maskedName: null,
+  history: [],
   asOf: '2026-06-29T00:00:00.000Z',
 }
 
@@ -59,7 +61,7 @@ describe('useBalanceLookup', () => {
     expect(result.current.state).toEqual({ status: 'success', data: dto })
     if (result.current.state.status === 'success') {
       expect(Object.keys(result.current.state.data).sort()).toEqual(
-        ['asOf', 'points', 'pointsToNextReward', 'rewardThreshold', 'storeName'].sort(),
+        ['asOf', 'history', 'maskedName', 'points', 'pointsToNextReward', 'rewardThreshold', 'storeName'].sort(),
       )
     }
   })

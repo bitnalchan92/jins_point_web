@@ -1,13 +1,23 @@
 import { z } from 'zod'
 
+export const historyItemSchema = z.object({
+  type: z.enum(['earn', 'use']),
+  amount: z.number().int().positive(),
+  pointsAfter: z.number().int().nonnegative(),
+  createdAt: z.string(),
+})
+
 export const balanceResponseSchema = z.object({
   points: z.number().int().nonnegative(),
   rewardThreshold: z.number().int().positive(),
   pointsToNextReward: z.number().int().nonnegative(),
   storeName: z.string().min(1),
+  maskedName: z.string().nullable(),
+  history: z.array(historyItemSchema),
   asOf: z.string().datetime(),
 })
 
+export type HistoryItem = z.infer<typeof historyItemSchema>
 export type BalanceResponse = z.infer<typeof balanceResponseSchema>
 
 // ---------------------------------------------------------------------------

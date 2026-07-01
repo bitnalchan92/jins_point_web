@@ -41,7 +41,7 @@
 
 - 배경: 상단에서 퍼지는 radial-gradient(크림 → 옅은 베이지).
 - 라운드: 카드 `rounded-[20~26px]`, 칩 `rounded-full`, 키패드 키 `rounded-[13px]`.
-- 브랜드 로고: 🍙 옐로우 그라데이션 라운드 스퀘어 ([`src/ui/Logo.jsx`](../../src/ui/Logo.jsx)).
+- 브랜드 로고: 🍙 옐로우 그라데이션 라운드 스퀘어 ([`src/ui/Logo.tsx`](../../src/ui/Logo.tsx)).
 - 모션: `jp-fade` / `jp-pop` / `jp-shake` / `jp-toast` 키프레임을 `@theme`에 정의.
 
 **원칙 (ADR-0005에서 계승)**

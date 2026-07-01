@@ -8,8 +8,9 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     clearMocks: true,
-    // Supabase Edge Function tests are Deno tests (run via `npm run test:edge`),
-    // not vitest tests. Keep vitest scoped to the React app.
-    exclude: [...configDefaults.exclude, 'supabase/**'],
+    // Supabase Edge Function tests are Deno tests (run via `npm run test:edge`)
+    // and Playwright E2E specs run via `npm run test:e2e`; neither is a vitest
+    // test. Keep vitest scoped to the React app.
+    exclude: [...configDefaults.exclude, 'supabase/**', 'tests/e2e/**'],
   },
 })
