@@ -50,34 +50,59 @@ function bearerToken(request: Request): string {
 }
 
 /**
+ * Decode the `sub` claim from a JWT without a network call.
+ * PostgREST already verifies the signature on every query, so we can trust the
+ * payload — we just need the user ID to filter the app_user_roles query.
+ */
+function userIdFromJwt(token: string): string {
+  try {
+    const raw = token.split('.')[1]
+    if (!raw) throw new Error('no payload')
+    const padded = raw.replace(/-/g, '+').replace(/_/g, '/').padEnd(
+      raw.length + (4 - (raw.length % 4)) % 4,
+      '=',
+    )
+    const payload = JSON.parse(atob(padded)) as { sub?: string }
+    if (!payload.sub) throw new Error('no sub')
+    return payload.sub
+  } catch {
+    throw new HttpError(401, 'UNAUTHORIZED')
+  }
+}
+
+/**
  * Verifies the caller is an owner authenticated at aal2.
  *
  * 1. No Authorization header / empty token -> 401.
- * 2. `auth.getUser(token)` rejects an invalid/expired JWT -> 401.
- * 3. A user-scoped SELECT on `app_user_roles` returns a row ONLY when the
- *    `owner_read_roles` RLS policy passes, i.e. `private.is_owner_aal2()`.
- *    An aal1 owner or a non-owner aal2 user therefore sees no row -> 403.
+ * 2. Decodes `sub` from the JWT locally (no Auth API call); PostgREST verifies
+ *    the JWT signature on every query using the project JWT secret.
+ * 3. Filters `app_user_roles` by the decoded user_id. The `owner_read_roles`
+ *    RLS policy enforces `private.is_owner_aal2()`. An aal1 owner or a
+ *    non-owner aal2 user sees no row -> 403.
  *
- * The private-schema function is never exposed via the Data API; we observe its
- * effect indirectly through the RLS-filtered SELECT.
+ * Avoids calling `auth.getUser(token)` (Auth API network round-trip) which can
+ * hit per-account rate limits under rapid CI load and surface as spurious 401s.
  */
 export async function authenticateOwner(
   request: Request,
   createUserClient: CreateUserClient = defaultCreateUserClient,
 ): Promise<OwnerContext> {
   const token = bearerToken(request)
+  const userId = userIdFromJwt(token)
   const client = createUserClient(token)
 
-  const { data: userData, error: userError } = await client.auth.getUser(token)
-  if (userError || !userData?.user) throw new HttpError(401, 'UNAUTHORIZED')
-
-  const { data: role } = await client
+  // PostgREST verifies the JWT signature on every query. A JWT error (expired,
+  // bad signature) surfaces as a non-null roleError. A valid JWT with no
+  // matching owner+aal2 row (aal1 or non-owner) produces null data -> 403.
+  const { data: role, error: roleError } = await client
     .from('app_user_roles')
     .select('role')
-    .eq('user_id', userData.user.id)
+    .eq('user_id', userId)
     .eq('role', 'owner')
     .maybeSingle()
+
+  if (roleError) throw new HttpError(401, 'UNAUTHORIZED')
   if (!role) throw new HttpError(403, 'OWNER_AAL2_REQUIRED')
 
-  return { client, userId: userData.user.id }
+  return { client, userId }
 }

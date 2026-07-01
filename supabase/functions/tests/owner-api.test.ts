@@ -140,7 +140,7 @@ function ownerRequest(method: string, body?: unknown): Request {
   return new Request('http://127.0.0.1:54321/functions/v1/owner-api', init)
 }
 
-const ROLE_ROW: TableResolver = () => ({ data: { role: 'owner' }, error: null })
+const ROLE_ROW: TableResolver = () => ({ data: { role: 'owner', user_id: 'owner-uid' }, error: null })
 const NO_ROLE: TableResolver = () => ({ data: null, error: null })
 
 // ===========================================================================
@@ -157,10 +157,23 @@ Deno.test('auth: missing Authorization header -> 401', async () => {
   assertEquals(error.code, 'UNAUTHORIZED')
 })
 
-Deno.test('auth: invalid JWT (getUser fails) -> 401', async () => {
-  const client = new FakeClient({ user: null, userError: new Error('bad token') })
+Deno.test('auth: malformed JWT (cannot decode sub) -> 401', async () => {
   const error = await assertRejects(
-    () => authenticateOwner(ownerRequest('GET'), () => client as never),
+    () => authenticateOwner(ownerRequest('GET'), () => new FakeClient() as never),
+    HttpError,
+  )
+  assertEquals(error.status, 401)
+  assertEquals(error.code, 'UNAUTHORIZED')
+})
+
+Deno.test('auth: valid JWT but PostgREST rejects it (role query error) -> 401', async () => {
+  const client = new FakeClient({
+    resolvers: {
+      app_user_roles: () => ({ data: null, error: { code: 'PGRST301', message: 'JWT expired' } }),
+    },
+  })
+  const error = await assertRejects(
+    () => authenticateOwner(ownerJwtRequest('GET'), () => client as never),
     HttpError,
   )
   assertEquals(error.status, 401)
@@ -168,13 +181,10 @@ Deno.test('auth: invalid JWT (getUser fails) -> 401', async () => {
 })
 
 Deno.test('auth: valid aal1 owner (no role row from RLS) -> 403', async () => {
-  // aal1 owner: getUser succeeds but owner_read_roles RLS hides the row.
-  const client = new FakeClient({
-    user: { id: 'owner-uid' },
-    resolvers: { app_user_roles: NO_ROLE },
-  })
+  // aal1 owner: JWT decodes fine but owner_read_roles RLS hides the row.
+  const client = new FakeClient({ resolvers: { app_user_roles: NO_ROLE } })
   const error = await assertRejects(
-    () => authenticateOwner(ownerRequest('GET'), () => client as never),
+    () => authenticateOwner(ownerJwtRequest('GET'), () => client as never),
     HttpError,
   )
   assertEquals(error.status, 403)
@@ -182,32 +192,44 @@ Deno.test('auth: valid aal1 owner (no role row from RLS) -> 403', async () => {
 })
 
 Deno.test('auth: non-owner aal2 (no role row from RLS) -> 403', async () => {
-  const client = new FakeClient({
-    user: { id: 'staff-uid' },
-    resolvers: { app_user_roles: NO_ROLE },
-  })
+  const client = new FakeClient({ resolvers: { app_user_roles: NO_ROLE } })
   const error = await assertRejects(
-    () => authenticateOwner(ownerRequest('GET'), () => client as never),
+    () => authenticateOwner(ownerJwtRequest('GET'), () => client as never),
     HttpError,
   )
   assertEquals(error.status, 403)
   assertEquals(error.code, 'OWNER_AAL2_REQUIRED')
 })
 
-Deno.test('auth: owner aal2 (role row visible) -> resolves context, queries owner role only', async () => {
-  const client = new FakeClient({
-    user: { id: 'owner-uid' },
-    resolvers: { app_user_roles: ROLE_ROW },
-  })
-  const ctx = await authenticateOwner(ownerRequest('GET'), () => client as never)
+// A minimal valid-shaped JWT with sub = 'owner-uid' and aal = 'aal2'.
+// Decoded payload: { sub: 'owner-uid', aal: 'aal2' }
+// (PostgREST does the real signature check; we only need a decodable payload)
+const FAKE_JWT =
+  'eyJhbGciOiJIUzI1NiJ9.' + // header
+  btoa(JSON.stringify({ sub: 'owner-uid', aal: 'aal2' }))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '') + // payload
+  '.fakesig' // signature (PostgREST verifies; the fake client does not)
+
+function ownerJwtRequest(method: string, body?: unknown): Request {
+  const init: RequestInit = { method, headers: { authorization: `Bearer ${FAKE_JWT}` } }
+  if (body !== undefined) {
+    init.body = JSON.stringify(body)
+    init.headers = { ...init.headers, 'content-type': 'application/json' }
+  }
+  return new Request('http://127.0.0.1:54321/functions/v1/owner-api', init)
+}
+
+Deno.test('auth: owner aal2 (role row visible) -> resolves context, filters by decoded user_id', async () => {
+  const client = new FakeClient({ resolvers: { app_user_roles: ROLE_ROW } })
+  const ctx = await authenticateOwner(ownerJwtRequest('GET'), () => client as never)
   assertEquals(ctx.userId, 'owner-uid')
-  // The role SELECT must be filtered to owner role for the authenticated user.
+  // The role SELECT must be filtered by both user_id (from JWT sub) and role.
   const roleState = client.builders.find((b) => b.state.table === 'app_user_roles')?.state
   assert(roleState, 'app_user_roles was queried')
   assert(roleState!.maybeSingle, 'used maybeSingle')
   assert(
     roleState!.eqs.some(([c, v]) => c === 'user_id' && v === 'owner-uid'),
-    'filtered by user_id',
+    'filtered by user_id from JWT sub',
   )
   assert(roleState!.eqs.some(([c, v]) => c === 'role' && v === 'owner'), 'filtered by owner role')
 })
